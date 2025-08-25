@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>QODER Регер</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+    <style>
+      .layout { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+      .list { max-height: 70vh; overflow: auto; }
+      .row { display: grid; grid-template-columns: 80px 24px 1fr; gap: 8px; align-items: center; }
+      .row.pending { opacity: .8; }
+      .row.success { color: #0a7f2e; }
+      .row.failed { color: #a01212; }
+      .row.skipped { color: #6a6a6a; }
+      .badge { font-family: monospace; }
+      textarea { min-height: 140px; }
+    </style>
+  </head>
+  <body>
+    <main class="container">
+      <h2>QODER Регер — последовательная регистрация</h2>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div>
+          {% for category, msg in messages %}
+          <article class="{{ 'secondary' if category=='error' else 'primary' }}">
+            {{ msg }}
+          </article>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% endwith %}
+
+      <details>
+        <summary>Загрузить список (CSV или TXT)</summary>
+        <form action="/upload" method="post" enctype="multipart/form-data">
+          <input type="file" name="file" accept=".csv,.txt" required />
+          <button type="submit">Загрузить</button>
+        </form>
+      </details>
+
+      {% if accounts %}
+      <div class="layout">
+        <section>
+          <header><strong>Список аккаунтов</strong></header>
+          <div class="list">
+            <form action="/set_index" method="post">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Статус</th>
+                    <th>Email</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for acc in accounts %}
+                  <tr class="row {{ acc.status }}">
+                    <td>{{ loop.index }}</td>
+                    <td class="badge">
+                      {% if acc.status == 'success' %}[✓]{% elif acc.status == 'failed' %}[x]{% elif acc.status == 'skipped' %}[-]{% else %}[ ]{% endif %}
+                    </td>
+                    <td>
+                      <button name="index" value="{{ loop.index0 }}" class="contrast" type="submit">{{ acc.email }}</button>
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </form>
+          </div>
+        </section>
+
+        <section>
+          {% set acc = accounts[current_index] %}
+          <header><strong>Текущий аккаунт: {{ current_index + 1 }}/{{ accounts|length }}</strong></header>
+          <form action="/mark" method="post">
+            <label>Email
+              <input type="text" value="{{ acc.email }}" readonly />
+            </label>
+            <label>Пароль
+              <input type="text" value="{{ acc.password }}" readonly />
+            </label>
+            <label>Заметки
+              <textarea name="notes">{{ acc.notes }}</textarea>
+            </label>
+            <div>
+              <button name="status" value="success">Успех</button>
+              <button name="status" value="failed" class="secondary">Фейл</button>
+              <button name="status" value="skipped" class="contrast">Пропуск</button>
+            </div>
+          </form>
+          <footer>
+            <a href="/export">Сохранить прогресс (CSV)</a>
+          </footer>
+        </section>
+      </div>
+      {% else %}
+        <article>Загрузите список аккаунтов, чтобы начать.</article>
+      {% endif %}
+    </main>
+  </body>
+  </html>
+
