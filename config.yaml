@@ -1,0 +1,13 @@
+url: "https://example.com/register"
+headless: true
+default_password: "ChangeMe!234"
+delay_seconds_between_accounts: 2
+success_indicator:
+  type: "css"   # css | text
+  value: "div.registration-success"
+selectors:
+  email: "input[name='email']"
+  username: "input[name='username']"  # optional; set empty if not required
+  password: "input[name='password']"
+  confirm_password: "input[name='passwordConfirm']"  # optional; set empty if not required
+  submit: "button[type='submit']"
