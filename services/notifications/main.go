@@ -45,6 +45,16 @@ func main() {
 	mux.Handle("GET /api/notifications/unread-count", authMw(http.HandlerFunc(handleUnreadCount)))
 	mux.Handle("POST /api/notifications/generate", authMw(http.HandlerFunc(handleGenerate)))
 
+	// Phase 7: Smart Alerts & Channels
+	mux.Handle("POST /api/notifications/smart-alerts", authMw(http.HandlerFunc(handleSmartAlerts)))
+	mux.Handle("POST /api/notifications/channels", authMw(http.HandlerFunc(handleConfigureChannels)))
+	mux.Handle("GET /api/notifications/channels", authMw(http.HandlerFunc(handleGetChannels)))
+	mux.Handle("POST /api/notifications/dispatch", authMw(http.HandlerFunc(handleDispatch)))
+	mux.Handle("POST /api/notifications/test-channel", authMw(http.HandlerFunc(handleTestChannel)))
+	mux.Handle("GET /api/notifications/rules", authMw(http.HandlerFunc(handleGetRules)))
+	mux.Handle("POST /api/notifications/rules", authMw(http.HandlerFunc(handleUpdateRules)))
+	mux.Handle("POST /api/notifications/digest", authMw(http.HandlerFunc(handleDigest)))
+
 	log.Printf("Notification service starting on :%s", cfg.HTTPPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, mux))
 }
