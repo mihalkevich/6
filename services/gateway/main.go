@@ -25,6 +25,7 @@ var serviceRoutes = map[string]string{
 	"/api/competitors":   envOrDefault("COMPETITOR_SERVICE_URL", "http://localhost:8085"),
 	"/api/seo":           envOrDefault("SEO_SERVICE_URL", "http://localhost:8086"),
 	"/api/notifications": envOrDefault("NOTIFICATION_SERVICE_URL", "http://localhost:8087"),
+	"/api/fashion":       envOrDefault("FASHION_SERVICE_URL", "http://localhost:8088"),
 }
 
 func main() {
@@ -49,7 +50,8 @@ func main() {
 				{"name": "sales-analytics", "prefix": "/api/sales", "description": "Sales Dashboard, Funnels, ABC, Trends"},
 				{"name": "competitor", "prefix": "/api/competitors", "description": "Competitor Analysis & Price Compare"},
 				{"name": "seo", "prefix": "/api/seo", "description": "SEO & Keyword Position Tracking"},
-				{"name": "notifications", "prefix": "/api/notifications", "description": "Alerts & Notifications"}
+				{"name": "notifications", "prefix": "/api/notifications", "description": "Alerts & Notifications"},
+				{"name": "fashion-analytics", "prefix": "/api/fashion", "description": "Fashion Analytics: Sizes, Seasons, Trends, Returns"}
 			]
 		}`)
 	})

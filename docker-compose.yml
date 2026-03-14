@@ -18,6 +18,7 @@ services:
       - COMPETITOR_SERVICE_URL=http://competitor:8080
       - SEO_SERVICE_URL=http://seo:8080
       - NOTIFICATION_SERVICE_URL=http://notifications:8080
+      - FASHION_SERVICE_URL=http://fashion-analytics:8080
     depends_on:
       - auth
       - collector
@@ -26,6 +27,7 @@ services:
       - competitor
       - seo
       - notifications
+      - fashion-analytics
 
   auth:
     build:
@@ -93,6 +95,16 @@ services:
       dockerfile: Dockerfile
       args:
         SERVICE: notifications
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+
+  fashion-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: fashion-analytics
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
