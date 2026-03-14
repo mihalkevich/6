@@ -194,10 +194,35 @@ type WBSearchProduct struct {
 	Sale     int     `json:"sale"`
 }
 
+// Region represents a WB delivery destination for regional search results.
+type Region struct {
+	Name string `json:"name"` // Human-readable name
+	Dest int    `json:"dest"` // WB dest parameter value
+}
+
+// KnownRegions contains predefined WB regions for position tracking.
+var KnownRegions = []Region{
+	{Name: "Москва", Dest: -1257786},
+	{Name: "Санкт-Петербург", Dest: -140294},
+	{Name: "Екатеринбург", Dest: -1113276},
+	{Name: "Новосибирск", Dest: -1221148},
+	{Name: "Краснодар", Dest: -1059500},
+}
+
 // SearchProducts searches WB catalog by keyword (public API).
 func (c *Client) SearchProducts(keyword string, page int) (*WBSearchResult, error) {
+	return c.SearchProductsRegion(keyword, page, 0)
+}
+
+// SearchProductsRegion searches WB catalog with a specific region dest parameter.
+// If dest is 0, the default region (Moscow) is used.
+func (c *Client) SearchProductsRegion(keyword string, page, dest int) (*WBSearchResult, error) {
 	u := fmt.Sprintf("%s/exactmatch/ru/common/v4/search?query=%s&resultset=catalog&page=%d&sort=popular&suppressSpellcheck=false",
 		BaseSearchURL, url.QueryEscape(keyword), page)
+
+	if dest != 0 {
+		u += fmt.Sprintf("&dest=%d", dest)
+	}
 
 	req, err := http.NewRequest(http.MethodGet, u, nil)
 	if err != nil {

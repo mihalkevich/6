@@ -63,6 +63,13 @@ func main() {
 	mux.Handle("POST /api/seo/cluster-keywords", authMw(http.HandlerFunc(handleClusterKeywords)))
 	mux.Handle("POST /api/seo/keyword-stats", authMw(http.HandlerFunc(handleKeywordStats)))
 
+	// Phase 3: Positions Pro
+	mux.Handle("POST /api/seo/check-positions-regional", authMw(http.HandlerFunc(handleCheckPositionsRegional)))
+	mux.Handle("GET /api/seo/regions", authMw(http.HandlerFunc(handleListRegions)))
+	mux.Handle("POST /api/seo/competitor-positions", authMw(http.HandlerFunc(handleCompetitorPositions)))
+	mux.Handle("POST /api/seo/forecast", authMw(http.HandlerFunc(handleForecast)))
+	mux.Handle("POST /api/seo/history/enhanced", authMw(http.HandlerFunc(handleEnhancedHistory)))
+
 	log.Printf("SEO & Keywords service starting on :%s", cfg.HTTPPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, mux))
 }
