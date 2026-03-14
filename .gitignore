@@ -29,3 +29,13 @@ bin/
 .idea/
 .vscode/
 *.swp
+
+# Build binaries
+collector
+notifications
+seo
+gateway
+auth
+stock-analytics
+sales-analytics
+competitor
