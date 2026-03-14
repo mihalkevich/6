@@ -1,0 +1,98 @@
+version: "3.9"
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - HTTP_PORT=8080
+      - AUTH_SERVICE_URL=http://auth:8080
+      - COLLECTOR_SERVICE_URL=http://collector:8080
+      - STOCK_SERVICE_URL=http://stock-analytics:8080
+      - SALES_SERVICE_URL=http://sales-analytics:8080
+      - COMPETITOR_SERVICE_URL=http://competitor:8080
+      - SEO_SERVICE_URL=http://seo:8080
+      - NOTIFICATION_SERVICE_URL=http://notifications:8080
+    depends_on:
+      - auth
+      - collector
+      - stock-analytics
+      - sales-analytics
+      - competitor
+      - seo
+      - notifications
+
+  auth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: auth
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+
+  collector:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: collector
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+
+  stock-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: stock-analytics
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+
+  sales-analytics:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: sales-analytics
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+
+  competitor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: competitor
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+
+  seo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: seo
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+
+  notifications:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: notifications
+    environment:
+      - HTTP_PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
