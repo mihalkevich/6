@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
+	"math/rand"
 	"net/http"
 	"sort"
 	"sync"
@@ -13,12 +15,33 @@ import (
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
 
+const (
+	maxSearchPages     = 10                // search depth (was 5)
+	maxConcurrent      = 5                 // parallel keyword searches
+	searchCacheTTL     = 15 * time.Minute  // cache WB search results
+	historyMaxAge      = 90 * 24 * time.Hour // keep 90 days of history
+	rateLimitDelay     = 200 * time.Millisecond // min delay between WB requests
+	rateLimitJitter    = 300 * time.Millisecond // random jitter on top
+)
+
 var (
 	cfg *config.Config
 
-	mu             sync.RWMutex
+	mu              sync.RWMutex
 	positionHistory = map[int64]map[string][]positionRecord{} // nmID -> keyword -> history
+
+	// In-memory search cache: "keyword:page" -> cached result
+	cacheMu     sync.RWMutex
+	searchCache = map[string]cachedSearch{}
+
+	// Rate limiter for WB Search API
+	searchLimiter = make(chan struct{}, maxConcurrent)
 )
+
+type cachedSearch struct {
+	result    *wbapi.WBSearchResult
+	fetchedAt time.Time
+}
 
 type positionRecord struct {
 	Position  int       `json:"position"`
@@ -69,55 +92,135 @@ func handleCheckPositions(w http.ResponseWriter, r *http.Request) {
 	}
 
 	client := wbapi.NewClient("")
-	var results []positionResult
+
+	// Process keywords in parallel with semaphore
+	type kwResult struct {
+		results []positionResult
+	}
+
+	var wg sync.WaitGroup
+	resultsCh := make(chan kwResult, len(req.Keywords))
 
 	for _, keyword := range req.Keywords {
-		found := map[int64]bool{}
-		for page := 1; page <= 5; page++ { // Search up to 5 pages
-			searchResult, err := client.SearchProducts(keyword, page)
-			if err != nil {
-				break
-			}
-			for pos, p := range searchResult.Data.Products {
-				if nmIDSet[p.ID] && !found[p.ID] {
-					found[p.ID] = true
-					globalPos := (page-1)*100 + pos + 1
-					results = append(results, positionResult{
-						NmID:     p.ID,
-						Keyword:  keyword,
-						Position: globalPos,
-						Page:     page,
-						Found:    true,
-					})
+		wg.Add(1)
+		go func(kw string) {
+			defer wg.Done()
+			searchLimiter <- struct{}{}        // acquire semaphore
+			defer func() { <-searchLimiter }() // release semaphore
 
-					// Save to history
-					mu.Lock()
-					if positionHistory[p.ID] == nil {
-						positionHistory[p.ID] = map[string][]positionRecord{}
+			var kwResults []positionResult
+			found := map[int64]bool{}
+			allFound := false
+
+			for page := 1; page <= maxSearchPages; page++ {
+				searchResult := cachedSearchProducts(client, kw, page)
+				if searchResult == nil {
+					break
+				}
+				for pos, p := range searchResult.Data.Products {
+					if nmIDSet[p.ID] && !found[p.ID] {
+						found[p.ID] = true
+						globalPos := (page-1)*100 + pos + 1
+						kwResults = append(kwResults, positionResult{
+							NmID:     p.ID,
+							Keyword:  kw,
+							Position: globalPos,
+							Page:     page,
+							Found:    true,
+						})
+
+						savePositionHistory(p.ID, kw, globalPos, page)
 					}
-					positionHistory[p.ID][keyword] = append(positionHistory[p.ID][keyword], positionRecord{
-						Position:  globalPos,
-						Page:      page,
-						CheckedAt: time.Now(),
-					})
-					mu.Unlock()
+				}
+
+				// Early exit: all products found — no need to check more pages
+				if len(found) == len(req.NmIDs) {
+					allFound = true
+					break
 				}
 			}
-		}
 
-		// Mark not found
-		for _, nmID := range req.NmIDs {
-			if !found[nmID] {
-				results = append(results, positionResult{
-					NmID:    nmID,
-					Keyword: keyword,
-					Found:   false,
-				})
+			// Mark not found
+			if !allFound {
+				for _, nmID := range req.NmIDs {
+					if !found[nmID] {
+						kwResults = append(kwResults, positionResult{
+							NmID:    nmID,
+							Keyword: kw,
+							Found:   false,
+						})
+					}
+				}
 			}
-		}
+
+			resultsCh <- kwResult{results: kwResults}
+		}(keyword)
+	}
+
+	wg.Wait()
+	close(resultsCh)
+
+	var results []positionResult
+	for kr := range resultsCh {
+		results = append(results, kr.results...)
 	}
 
 	jsonResponse(w, http.StatusOK, results)
+}
+
+// cachedSearchProducts returns cached WB search results or fetches fresh ones.
+func cachedSearchProducts(client *wbapi.Client, keyword string, page int) *wbapi.WBSearchResult {
+	cacheKey := fmt.Sprintf("%s:%d", keyword, page)
+
+	cacheMu.RLock()
+	cached, ok := searchCache[cacheKey]
+	cacheMu.RUnlock()
+
+	if ok && time.Since(cached.fetchedAt) < searchCacheTTL {
+		return cached.result
+	}
+
+	// Rate limit: add delay with jitter to avoid WB anti-bot
+	jitter := time.Duration(rand.Int63n(int64(rateLimitJitter)))
+	time.Sleep(rateLimitDelay + jitter)
+
+	result, err := client.SearchProducts(keyword, page)
+	if err != nil {
+		log.Printf("WB search error keyword=%q page=%d: %v", keyword, page, err)
+		return nil
+	}
+
+	cacheMu.Lock()
+	searchCache[cacheKey] = cachedSearch{result: result, fetchedAt: time.Now()}
+	cacheMu.Unlock()
+
+	return result
+}
+
+// savePositionHistory saves a position record and rotates old entries.
+func savePositionHistory(nmID int64, keyword string, position, page int) {
+	mu.Lock()
+	defer mu.Unlock()
+
+	if positionHistory[nmID] == nil {
+		positionHistory[nmID] = map[string][]positionRecord{}
+	}
+	positionHistory[nmID][keyword] = append(positionHistory[nmID][keyword], positionRecord{
+		Position:  position,
+		Page:      page,
+		CheckedAt: time.Now(),
+	})
+
+	// Rotate: remove records older than historyMaxAge
+	cutoff := time.Now().Add(-historyMaxAge)
+	records := positionHistory[nmID][keyword]
+	start := 0
+	for start < len(records) && records[start].CheckedAt.Before(cutoff) {
+		start++
+	}
+	if start > 0 {
+		positionHistory[nmID][keyword] = records[start:]
+	}
 }
 
 // --- Track Keywords ---

@@ -64,11 +64,19 @@ func handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate key by making a test request to WB API
+	client := wbapi.NewClient(req.APIKey)
+	_, err := client.GetStocks(time.Now())
+	if err != nil {
+		httpError(w, "invalid WB API key: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
 	mu.Lock()
 	userAPIKeys[userID] = req.APIKey
 	mu.Unlock()
 
-	jsonResponse(w, http.StatusOK, map[string]string{"status": "registered"})
+	jsonResponse(w, http.StatusOK, map[string]string{"status": "registered", "message": "API key validated and saved"})
 }
 
 func handleSync(w http.ResponseWriter, r *http.Request) {

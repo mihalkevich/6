@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/wb-analytics/wb-seller-tools/pkg/config"
@@ -18,7 +19,7 @@ var (
 
 	mu     sync.RWMutex
 	alerts = map[int64][]alert{} // userID -> alerts
-	nextID int64
+	nextID atomic.Int64
 )
 
 type alert struct {
@@ -83,10 +84,10 @@ func handleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	id := nextID.Add(1)
 	mu.Lock()
-	nextID++
 	a := alert{
-		ID:        nextID,
+		ID:        id,
 		UserID:    userID,
 		Type:      req.Type,
 		Title:     req.Title,
@@ -225,9 +226,9 @@ func handleGenerate(w http.ResponseWriter, r *http.Request) {
 }
 
 func createAlert(userID int64, alertType, severity, title, message string) alert {
-	nextID++
+	id := nextID.Add(1)
 	return alert{
-		ID:        nextID,
+		ID:        id,
 		UserID:    userID,
 		Type:      alertType,
 		Title:     title,
