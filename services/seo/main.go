@@ -70,6 +70,15 @@ func main() {
 	mux.Handle("POST /api/seo/forecast", authMw(http.HandlerFunc(handleForecast)))
 	mux.Handle("POST /api/seo/history/enhanced", authMw(http.HandlerFunc(handleEnhancedHistory)))
 
+	// Phase 5: Card Optimization
+	mux.Handle("POST /api/seo/card-audit", authMw(http.HandlerFunc(handleCardAudit)))
+	mux.Handle("POST /api/seo/generate-title", authMw(http.HandlerFunc(handleGenerateTitle)))
+	mux.Handle("POST /api/seo/generate-description", authMw(http.HandlerFunc(handleGenerateDescription)))
+	mux.Handle("POST /api/seo/photo-recommendations", authMw(http.HandlerFunc(handlePhotoRecommendations)))
+	mux.Handle("POST /api/seo/card-snapshot", authMw(http.HandlerFunc(handleSaveSnapshot)))
+	mux.Handle("POST /api/seo/card-snapshots", authMw(http.HandlerFunc(handleGetSnapshots)))
+	mux.Handle("POST /api/seo/card-compare", authMw(http.HandlerFunc(handleCompareSnapshots)))
+
 	log.Printf("SEO & Keywords service starting on :%s", cfg.HTTPPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, mux))
 }
