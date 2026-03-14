@@ -24,6 +24,13 @@ func main() {
 	mux.Handle("POST /api/competitors/gaps", authMw(http.HandlerFunc(handleFindGaps)))
 	mux.Handle("POST /api/competitors/price-compare", authMw(http.HandlerFunc(handlePriceCompare)))
 
+	// Phase 6: Advanced Competitor Analysis
+	mux.Handle("POST /api/competitors/monitor", authMw(http.HandlerFunc(handleMonitorKeywords)))
+	mux.Handle("POST /api/competitors/watchlist", authMw(http.HandlerFunc(handleWatchlist)))
+	mux.Handle("POST /api/competitors/pricing", authMw(http.HandlerFunc(handlePricingAnalysis)))
+	mux.Handle("POST /api/competitors/discounts", authMw(http.HandlerFunc(handleDiscountAnalysis)))
+	mux.Handle("POST /api/competitors/reviews", authMw(http.HandlerFunc(handleReviewAnalysis)))
+
 	log.Printf("Competitor Analysis service starting on :%s", cfg.HTTPPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, mux))
 }
