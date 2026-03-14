@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wb-analytics/wb-seller-tools/pkg/config"
+	"github.com/wb-analytics/wb-seller-tools/pkg/fashion"
 	"github.com/wb-analytics/wb-seller-tools/pkg/middleware"
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
@@ -59,6 +60,8 @@ func main() {
 	mux.Handle("POST /api/seo/track-keywords", authMw(http.HandlerFunc(handleTrackKeywords)))
 	mux.Handle("GET /api/seo/history", authMw(http.HandlerFunc(handleHistory)))
 	mux.Handle("POST /api/seo/suggest-keywords", authMw(http.HandlerFunc(handleSuggestKeywords)))
+	mux.Handle("POST /api/seo/cluster-keywords", authMw(http.HandlerFunc(handleClusterKeywords)))
+	mux.Handle("POST /api/seo/keyword-stats", authMw(http.HandlerFunc(handleKeywordStats)))
 
 	log.Printf("SEO & Keywords service starting on :%s", cfg.HTTPPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, mux))
@@ -314,9 +317,15 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 // --- Suggest Keywords ---
 
 type suggestRequest struct {
-	ProductName string `json:"product_name"`
-	Category    string `json:"category"`
-	Brand       string `json:"brand"`
+	ProductName string   `json:"product_name"`
+	Category    string   `json:"category"`
+	Brand       string   `json:"brand"`
+	Materials   []string `json:"materials,omitempty"`
+	Style       string   `json:"style,omitempty"`
+	Season      string   `json:"season,omitempty"`
+	Color       string   `json:"color,omitempty"`
+	Occasion    string   `json:"occasion,omitempty"`
+	Gender      string   `json:"gender,omitempty"`
 }
 
 func handleSuggestKeywords(w http.ResponseWriter, r *http.Request) {
@@ -326,35 +335,29 @@ func handleSuggestKeywords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Generate keyword suggestions based on product info
-	suggestions := generateKeywordSuggestions(req.ProductName, req.Category, req.Brand)
+	dict := fashion.DefaultDictionary()
+	hints := fashion.GeneratorHints{
+		Materials: req.Materials,
+		Style:     req.Style,
+		Season:    req.Season,
+		Color:     req.Color,
+		Occasion:  req.Occasion,
+		Gender:    req.Gender,
+	}
+
+	groups := dict.GenerateKeywords(req.ProductName, req.Category, req.Brand, hints)
+
+	// Also compute total count.
+	total := 0
+	for _, g := range groups {
+		total += len(g.Keywords)
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"product_name": req.ProductName,
-		"suggestions":  suggestions,
+		"product_name":    req.ProductName,
+		"suggestion_groups": groups,
+		"total_keywords":  total,
 	})
-}
-
-func generateKeywordSuggestions(name, category, brand string) []string {
-	suggestions := []string{}
-
-	if name != "" {
-		suggestions = append(suggestions, name)
-	}
-	if category != "" {
-		suggestions = append(suggestions, category)
-		if brand != "" {
-			suggestions = append(suggestions, category+" "+brand)
-		}
-	}
-	if brand != "" {
-		suggestions = append(suggestions, brand)
-	}
-	if name != "" && brand != "" {
-		suggestions = append(suggestions, brand+" "+name)
-	}
-
-	return suggestions
 }
 
 // --- Helpers ---

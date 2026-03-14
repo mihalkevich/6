@@ -30,12 +30,12 @@ bin/
 .vscode/
 *.swp
 
-# Build binaries
-collector
-notifications
-seo
-gateway
-auth
-stock-analytics
-sales-analytics
-competitor
+# Build binaries (root level only)
+/collector
+/notifications
+/seo
+/gateway
+/auth
+/stock-analytics
+/sales-analytics
+/competitor
