@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wb-analytics/wb-seller-tools/pkg/dataclient"
 	"github.com/wb-analytics/wb-seller-tools/pkg/fashion"
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
@@ -42,7 +43,8 @@ var seasonKeywords = map[string]string{
 // --- Seasonal Analysis ---
 
 type seasonalRequest struct {
-	Sales []wbapi.WBSale `json:"sales"`
+	APIKeyID int64          `json:"api_key_id"`
+	Sales    []wbapi.WBSale `json:"sales"`
 }
 
 type productSeasonality struct {
@@ -66,6 +68,15 @@ func handleSeasonalAnalysis(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
 	}
 
 	now := time.Now()
@@ -158,8 +169,9 @@ func handleSeasonalAnalysis(w http.ResponseWriter, r *http.Request) {
 // --- Seasonal Forecast ---
 
 type forecastRequest struct {
-	Sales      []wbapi.WBSale `json:"sales"`
-	ForecastDays int          `json:"forecast_days,omitempty"` // default 30
+	APIKeyID     int64          `json:"api_key_id"`
+	Sales        []wbapi.WBSale `json:"sales"`
+	ForecastDays int            `json:"forecast_days,omitempty"`
 }
 
 type productForecast struct {
@@ -178,6 +190,15 @@ func handleSeasonalForecast(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
 	}
 
 	days := req.ForecastDays

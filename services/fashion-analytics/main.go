@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/wb-analytics/wb-seller-tools/pkg/config"
+	"github.com/wb-analytics/wb-seller-tools/pkg/dataclient"
 	"github.com/wb-analytics/wb-seller-tools/pkg/middleware"
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
@@ -44,9 +45,10 @@ func main() {
 // --- Size Analysis ---
 
 type sizeAnalysisRequest struct {
-	Sales  []wbapi.WBSale  `json:"sales"`
-	Stocks []wbapi.WBStock `json:"stocks"`
-	Orders []wbapi.WBOrder `json:"orders"`
+	APIKeyID int64           `json:"api_key_id"`
+	Sales    []wbapi.WBSale  `json:"sales"`
+	Stocks   []wbapi.WBStock `json:"stocks"`
+	Orders   []wbapi.WBOrder `json:"orders"`
 }
 
 type productSizeAnalysis struct {
@@ -75,6 +77,17 @@ func handleSizeAnalysis(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
+		req.Stocks = data.Stocks
+		req.Orders = data.Orders
 	}
 
 	// Aggregate sales by nmID+size.
@@ -220,8 +233,9 @@ func handleSizeAnalysis(w http.ResponseWriter, r *http.Request) {
 // --- Size Recommendations ---
 
 type sizeRecRequest struct {
-	Sales  []wbapi.WBSale  `json:"sales"`
-	Stocks []wbapi.WBStock `json:"stocks"`
+	APIKeyID int64           `json:"api_key_id"`
+	Sales    []wbapi.WBSale  `json:"sales"`
+	Stocks   []wbapi.WBStock `json:"stocks"`
 }
 
 type sizeRecommendation struct {
@@ -241,6 +255,16 @@ func handleSizeRecommendations(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
+		req.Stocks = data.Stocks
 	}
 
 	now := time.Now()

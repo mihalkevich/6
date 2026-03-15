@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -55,6 +56,8 @@ func main() {
 	authMux.HandleFunc("POST /api/keys", handleAddKey)
 	authMux.HandleFunc("DELETE /api/keys/{id}", handleDeleteKey)
 	authMux.HandleFunc("GET /api/me", handleMe)
+
+	authMux.HandleFunc("POST /api/keys/resolve", handleResolveKey)
 
 	protected := middleware.AuthMiddleware(cfg.JWTSecret)(authMux)
 	mux.Handle("/api/keys", protected)
@@ -159,8 +162,9 @@ func handleMe(w http.ResponseWriter, r *http.Request) {
 }
 
 type addKeyRequest struct {
-	Name  string `json:"name"`
-	Token string `json:"token"`
+	Name    string `json:"name"`
+	Token   string `json:"token"`
+	WBToken string `json:"wb_token"` // alias accepted from frontend
 }
 
 func handleAddKey(w http.ResponseWriter, r *http.Request) {
@@ -171,12 +175,17 @@ func handleAddKey(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	if req.Token == "" {
+	// Accept both "token" and "wb_token" fields
+	tok := req.Token
+	if tok == "" {
+		tok = req.WBToken
+	}
+	if tok == "" {
 		httpError(w, "token is required", http.StatusBadRequest)
 		return
 	}
 
-	encrypted, err := encrypt(req.Token, cfg.JWTSecret)
+	encrypted, err := encrypt(tok, cfg.JWTSecret)
 	if err != nil {
 		httpError(w, "encryption error", http.StatusInternalServerError)
 		return
@@ -206,7 +215,35 @@ func handleListKeys(w http.ResponseWriter, r *http.Request) {
 			"id": k.ID, "name": k.Name, "is_active": k.IsActive,
 		})
 	}
-	jsonResponse(w, http.StatusOK, result)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{"keys": result})
+}
+
+// handleResolveKey returns the decrypted WB API token for a given key ID.
+// Only returns keys belonging to the authenticated user.
+func handleResolveKey(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+
+	var req struct {
+		KeyID int64 `json:"key_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	keys := apiKeys[userID]
+	for _, k := range keys {
+		if k.ID == req.KeyID && k.IsActive {
+			decrypted, err := decrypt(k.TokenEncrypted, cfg.JWTSecret)
+			if err != nil {
+				httpError(w, "decryption error", http.StatusInternalServerError)
+				return
+			}
+			jsonResponse(w, http.StatusOK, map[string]string{"wb_token": decrypted})
+			return
+		}
+	}
+	httpError(w, "key not found", http.StatusNotFound)
 }
 
 func handleDeleteKey(w http.ResponseWriter, r *http.Request) {
@@ -255,6 +292,39 @@ func encrypt(plaintext, key string) (string, error) {
 
 	ciphertext := aesGCM.Seal(nonce, nonce, []byte(plaintext), nil)
 	return hex.EncodeToString(ciphertext), nil
+}
+
+func decrypt(cipherHex, key string) (string, error) {
+	keyBytes := make([]byte, 32)
+	copy(keyBytes, []byte(key))
+
+	ciphertext, err := hex.DecodeString(cipherHex)
+	if err != nil {
+		return "", err
+	}
+
+	block, err := aes.NewCipher(keyBytes)
+	if err != nil {
+		return "", err
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return "", err
+	}
+
+	nonceSize := aesGCM.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return "", fmt.Errorf("ciphertext too short")
+	}
+
+	nonce, ciphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", err
+	}
+
+	return string(plaintext), nil
 }
 
 func httpError(w http.ResponseWriter, msg string, code int) {

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wb-analytics/wb-seller-tools/pkg/config"
+	"github.com/wb-analytics/wb-seller-tools/pkg/dataclient"
 	"github.com/wb-analytics/wb-seller-tools/pkg/middleware"
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
@@ -33,8 +34,9 @@ func main() {
 // --- Dashboard ---
 
 type dashboardRequest struct {
-	Sales  []wbapi.WBSale  `json:"sales"`
-	Orders []wbapi.WBOrder `json:"orders"`
+	APIKeyID int64           `json:"api_key_id"`
+	Sales    []wbapi.WBSale  `json:"sales"`
+	Orders   []wbapi.WBOrder `json:"orders"`
 }
 
 type dashboardResponse struct {
@@ -75,6 +77,16 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && len(req.Orders) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
+		req.Orders = data.Orders
 	}
 
 	var totalRevenue float64
@@ -180,8 +192,9 @@ func handleDashboard(w http.ResponseWriter, r *http.Request) {
 // --- Funnel ---
 
 type funnelRequest struct {
-	Sales  []wbapi.WBSale  `json:"sales"`
-	Orders []wbapi.WBOrder `json:"orders"`
+	APIKeyID int64           `json:"api_key_id"`
+	Sales    []wbapi.WBSale  `json:"sales"`
+	Orders   []wbapi.WBOrder `json:"orders"`
 }
 
 type funnelItem struct {
@@ -201,6 +214,16 @@ func handleFunnel(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && len(req.Orders) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
+		req.Orders = data.Orders
 	}
 
 	type agg struct {
@@ -275,7 +298,8 @@ func handleFunnel(w http.ResponseWriter, r *http.Request) {
 // --- ABC Analysis ---
 
 type abcRequest struct {
-	Sales []wbapi.WBSale `json:"sales"`
+	APIKeyID int64          `json:"api_key_id"`
+	Sales    []wbapi.WBSale `json:"sales"`
 }
 
 type abcItem struct {
@@ -292,6 +316,15 @@ func handleABC(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
 	}
 
 	revenueMap := map[int64]*struct {
@@ -369,7 +402,8 @@ func countABC(items []abcItem, cat string) int {
 // --- Trends ---
 
 type trendsRequest struct {
-	Sales []wbapi.WBSale `json:"sales"`
+	APIKeyID int64          `json:"api_key_id"`
+	Sales    []wbapi.WBSale `json:"sales"`
 }
 
 type trendItem struct {
@@ -388,6 +422,15 @@ func handleTrends(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
 	}
 
 	now := time.Now()

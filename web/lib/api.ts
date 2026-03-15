@@ -75,16 +75,24 @@ class ApiClient {
   }
 
   // Collector
-  getSales(apiKeyId: number, dateFrom: string) {
-    return this.post<{ sales: any[] }>("/api/collector/sales", { api_key_id: apiKeyId, date_from: dateFrom });
+  syncData(apiKeyId: number) {
+    return this.post<any>("/api/collector/sync", { api_key_id: apiKeyId });
   }
 
-  getOrders(apiKeyId: number, dateFrom: string) {
-    return this.post<{ orders: any[] }>("/api/collector/orders", { api_key_id: apiKeyId, date_from: dateFrom });
+  getCollectorStatus() {
+    return this.get<any>("/api/collector/status");
   }
 
-  getStocks(apiKeyId: number) {
-    return this.post<{ stocks: any[] }>("/api/collector/stocks", { api_key_id: apiKeyId });
+  getSales() {
+    return this.get<any[]>("/api/collector/sales");
+  }
+
+  getOrders() {
+    return this.get<any[]>("/api/collector/orders");
+  }
+
+  getStocks() {
+    return this.get<any[]>("/api/collector/stocks");
   }
 
   // Stock Analytics
@@ -141,19 +149,19 @@ class ApiClient {
 
   // Fashion Analytics
   getSizeAnalysis(apiKeyId: number) {
-    return this.post<any>("/api/fashion/sizes", { api_key_id: apiKeyId });
+    return this.post<any>("/api/fashion/size-analysis", { api_key_id: apiKeyId });
   }
 
   getSeasonalAnalysis(apiKeyId: number) {
-    return this.post<any>("/api/fashion/seasonal", { api_key_id: apiKeyId });
+    return this.post<any>("/api/fashion/seasonal-analysis", { api_key_id: apiKeyId });
   }
 
   getTrendMonitor(apiKeyId: number) {
-    return this.post<any>("/api/fashion/trends", { api_key_id: apiKeyId });
+    return this.post<any>("/api/fashion/trend-monitor", { api_key_id: apiKeyId });
   }
 
   getReturnAnalysis(apiKeyId: number) {
-    return this.post<any>("/api/fashion/returns", { api_key_id: apiKeyId });
+    return this.post<any>("/api/fashion/return-analysis", { api_key_id: apiKeyId });
   }
 
   // Notifications

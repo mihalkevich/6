@@ -6,14 +6,16 @@ import (
 	"net/http"
 	"sort"
 
+	"github.com/wb-analytics/wb-seller-tools/pkg/dataclient"
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
 
 // --- Return Analysis ---
 
 type returnRequest struct {
-	Sales  []wbapi.WBSale  `json:"sales"`
-	Orders []wbapi.WBOrder `json:"orders"`
+	APIKeyID int64           `json:"api_key_id"`
+	Sales    []wbapi.WBSale  `json:"sales"`
+	Orders   []wbapi.WBOrder `json:"orders"`
 }
 
 type productReturnAnalysis struct {
@@ -49,6 +51,16 @@ func handleReturnAnalysis(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
+		req.Orders = data.Orders
 	}
 
 	type sizeKey struct {

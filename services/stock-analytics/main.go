@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/wb-analytics/wb-seller-tools/pkg/config"
+	"github.com/wb-analytics/wb-seller-tools/pkg/dataclient"
 	"github.com/wb-analytics/wb-seller-tools/pkg/middleware"
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
@@ -22,6 +23,7 @@ func main() {
 	authMw := middleware.AuthMiddleware(cfg.JWTSecret)
 
 	mux.Handle("POST /api/stock/analyze", authMw(http.HandlerFunc(handleAnalyze)))
+	mux.Handle("POST /api/stock/analytics", authMw(http.HandlerFunc(handleAnalyze))) // alias for frontend
 	mux.Handle("POST /api/stock/supply-plan", authMw(http.HandlerFunc(handleSupplyPlan)))
 
 	log.Printf("Stock Analytics service starting on :%s", cfg.HTTPPort)
@@ -31,8 +33,9 @@ func main() {
 // --- Request/Response types ---
 
 type analyzeRequest struct {
-	Sales  []wbapi.WBSale  `json:"sales"`
-	Stocks []wbapi.WBStock `json:"stocks"`
+	APIKeyID int64           `json:"api_key_id"`
+	Sales    []wbapi.WBSale  `json:"sales"`
+	Stocks   []wbapi.WBStock `json:"stocks"`
 }
 
 type productAnalysis struct {
@@ -62,6 +65,17 @@ func handleAnalyze(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If no inline data but api_key_id provided, fetch from collector
+	if len(req.Sales) == 0 && len(req.Stocks) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
+		req.Stocks = data.Stocks
+	}
+
 	analysis := analyzeStocks(req.Sales, req.Stocks)
 
 	// Sort by urgency: critical first
@@ -79,9 +93,10 @@ func handleAnalyze(w http.ResponseWriter, r *http.Request) {
 }
 
 type supplyPlanRequest struct {
+	APIKeyID   int64           `json:"api_key_id"`
 	Sales      []wbapi.WBSale  `json:"sales"`
 	Stocks     []wbapi.WBStock `json:"stocks"`
-	TargetDays int             `json:"target_days"` // How many days of stock to aim for
+	TargetDays int             `json:"target_days"`
 }
 
 type supplyItem struct {
@@ -100,6 +115,16 @@ func handleSupplyPlan(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
+	}
+
+	if len(req.Sales) == 0 && len(req.Stocks) == 0 && req.APIKeyID > 0 {
+		data, err := dataclient.FetchData(r.Header.Get("Authorization"))
+		if err != nil {
+			httpError(w, "failed to fetch data: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+		req.Sales = data.Sales
+		req.Stocks = data.Stocks
 	}
 
 	if req.TargetDays <= 0 {

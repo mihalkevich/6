@@ -48,6 +48,7 @@ services:
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+      - AUTH_SERVICE_URL=http://auth:8080
 
   stock-analytics:
     build:
@@ -58,6 +59,7 @@ services:
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+      - COLLECTOR_SERVICE_URL=http://collector:8080
 
   sales-analytics:
     build:
@@ -68,6 +70,7 @@ services:
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+      - COLLECTOR_SERVICE_URL=http://collector:8080
 
   competitor:
     build:
@@ -108,6 +111,7 @@ services:
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+      - COLLECTOR_SERVICE_URL=http://collector:8080
 
   web:
     build:

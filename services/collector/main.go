@@ -1,9 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -12,37 +16,40 @@ import (
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
 
-// In-memory store; replace with DB in production.
 var (
-	cfg *config.Config
+	cfg            *config.Config
+	authServiceURL string
 
-	mu          sync.RWMutex
-	salesData   = map[int64][]wbapi.WBSale{}  // userID -> sales
-	ordersData  = map[int64][]wbapi.WBOrder{} // userID -> orders
-	stocksData  = map[int64][]wbapi.WBStock{} // userID -> stocks
-	lastSync    = map[int64]time.Time{}
+	mu         sync.RWMutex
+	salesData  = map[int64][]wbapi.WBSale{}
+	ordersData = map[int64][]wbapi.WBOrder{}
+	stocksData = map[int64][]wbapi.WBStock{}
+	lastSync   = map[int64]time.Time{}
 
-	// Simulated API key store — in production, fetched from auth service.
-	userAPIKeys = map[int64]string{} // userID -> WB API key
+	userAPIKeys = map[int64]string{} // userID -> WB API key (cached)
 )
 
 func main() {
 	cfg = config.Load()
+	authServiceURL = envOrDefault("AUTH_SERVICE_URL", "http://localhost:8081")
 
 	mux := http.NewServeMux()
-
 	authMw := middleware.AuthMiddleware(cfg.JWTSecret)
 
-	// Register API key for collection
+	// Register API key directly
 	mux.Handle("POST /api/collector/register-key", authMw(http.HandlerFunc(handleRegisterKey)))
-	// Trigger manual sync
+	// Sync data from WB (accepts api_key_id or uses cached key)
 	mux.Handle("POST /api/collector/sync", authMw(http.HandlerFunc(handleSync)))
-	// Get collected data
+	// Get collected data — support both GET and POST
 	mux.Handle("GET /api/collector/sales", authMw(http.HandlerFunc(handleGetSales)))
+	mux.Handle("POST /api/collector/sales", authMw(http.HandlerFunc(handleGetSales)))
 	mux.Handle("GET /api/collector/orders", authMw(http.HandlerFunc(handleGetOrders)))
+	mux.Handle("POST /api/collector/orders", authMw(http.HandlerFunc(handleGetOrders)))
 	mux.Handle("GET /api/collector/stocks", authMw(http.HandlerFunc(handleGetStocks)))
+	mux.Handle("POST /api/collector/stocks", authMw(http.HandlerFunc(handleGetStocks)))
 	// Status
 	mux.Handle("GET /api/collector/status", authMw(http.HandlerFunc(handleStatus)))
+	mux.Handle("POST /api/collector/status", authMw(http.HandlerFunc(handleStatus)))
 
 	log.Printf("Collector service starting on :%s", cfg.HTTPPort)
 	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, mux))
@@ -64,37 +71,51 @@ func handleRegisterKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate key by making a test request to WB API
-	client := wbapi.NewClient(req.APIKey)
-	_, err := client.GetStocks(time.Now())
-	if err != nil {
-		httpError(w, "invalid WB API key: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-
 	mu.Lock()
 	userAPIKeys[userID] = req.APIKey
 	mu.Unlock()
 
-	jsonResponse(w, http.StatusOK, map[string]string{"status": "registered", "message": "API key validated and saved"})
+	jsonResponse(w, http.StatusOK, map[string]string{"status": "registered"})
+}
+
+type syncRequest struct {
+	APIKeyID int64 `json:"api_key_id"`
 }
 
 func handleSync(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
-	mu.RLock()
-	apiKey, ok := userAPIKeys[userID]
-	mu.RUnlock()
+	var req syncRequest
+	json.NewDecoder(r.Body).Decode(&req)
 
-	if !ok {
-		httpError(w, "no API key registered, call POST /api/collector/register-key first", http.StatusBadRequest)
+	// Try to resolve API key: first from api_key_id via auth service, then cached
+	apiKey := ""
+	if req.APIKeyID > 0 {
+		resolved, err := resolveKeyFromAuth(req.APIKeyID, r.Header.Get("Authorization"))
+		if err != nil {
+			log.Printf("Failed to resolve key %d from auth: %v", req.APIKeyID, err)
+		} else {
+			apiKey = resolved
+			mu.Lock()
+			userAPIKeys[userID] = apiKey
+			mu.Unlock()
+		}
+	}
+
+	if apiKey == "" {
+		mu.RLock()
+		apiKey = userAPIKeys[userID]
+		mu.RUnlock()
+	}
+
+	if apiKey == "" {
+		httpError(w, "no API key: add a key in Settings, then sync", http.StatusBadRequest)
 		return
 	}
 
 	client := wbapi.NewClient(apiKey)
 	dateFrom := time.Now().AddDate(0, 0, -30)
 
-	// Fetch all data concurrently
 	type result struct {
 		sales  []wbapi.WBSale
 		orders []wbapi.WBOrder
@@ -147,10 +168,10 @@ func handleSync(w http.ResponseWriter, r *http.Request) {
 	mu.Unlock()
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"status":  "synced",
-		"sales":   len(res.sales),
-		"orders":  len(res.orders),
-		"stocks":  len(res.stocks),
+		"status":    "synced",
+		"sales":     len(res.sales),
+		"orders":    len(res.orders),
+		"stocks":    len(res.stocks),
 		"synced_at": time.Now().Format(time.RFC3339),
 	})
 }
@@ -160,6 +181,9 @@ func handleGetSales(w http.ResponseWriter, r *http.Request) {
 	mu.RLock()
 	data := salesData[userID]
 	mu.RUnlock()
+	if data == nil {
+		data = []wbapi.WBSale{}
+	}
 	jsonResponse(w, http.StatusOK, data)
 }
 
@@ -168,6 +192,9 @@ func handleGetOrders(w http.ResponseWriter, r *http.Request) {
 	mu.RLock()
 	data := ordersData[userID]
 	mu.RUnlock()
+	if data == nil {
+		data = []wbapi.WBOrder{}
+	}
 	jsonResponse(w, http.StatusOK, data)
 }
 
@@ -176,6 +203,9 @@ func handleGetStocks(w http.ResponseWriter, r *http.Request) {
 	mu.RLock()
 	data := stocksData[userID]
 	mu.RUnlock()
+	if data == nil {
+		data = []wbapi.WBStock{}
+	}
 	jsonResponse(w, http.StatusOK, data)
 }
 
@@ -204,6 +234,43 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		"orders":    ordersCount,
 		"stocks":    stocksCount,
 	})
+}
+
+// resolveKeyFromAuth calls the auth service to decrypt a WB API key by ID.
+func resolveKeyFromAuth(keyID int64, authHeader string) (string, error) {
+	body, _ := json.Marshal(map[string]int64{"key_id": keyID})
+	req, err := http.NewRequest("POST", authServiceURL+"/api/keys/resolve", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authHeader)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("auth service unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("auth returned %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var result struct {
+		WBToken string `json:"wb_token"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+	return result.WBToken, nil
+}
+
+func envOrDefault(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 func httpError(w http.ResponseWriter, msg string, code int) {
