@@ -111,11 +111,11 @@ class ApiClient {
 
   // SEO
   checkPositions(keyword: string, nmIds: number[]) {
-    return this.post<any>("/api/seo/check", { keyword, nm_ids: nmIds });
+    return this.post<any>("/api/seo/check-positions", { keyword, nm_ids: nmIds });
   }
 
   checkPositionsRegional(keyword: string, nmIds: number[]) {
-    return this.post<any>("/api/seo/regional", { keyword, nm_ids: nmIds });
+    return this.post<any>("/api/seo/check-positions-regional", { keyword, nm_ids: nmIds });
   }
 
   getRegions() {
