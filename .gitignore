@@ -39,3 +39,8 @@ bin/
 /stock-analytics
 /sales-analytics
 /competitor
+
+# Local run artifacts
+.bin/
+.logs/
+.pids/
