@@ -4,6 +4,9 @@ set -euo pipefail
 # ============================================
 # WB Seller Tools — локальный запуск (без Docker)
 # ============================================
+# Требования: PostgreSQL и Redis должны быть запущены.
+# Быстрый старт инфраструктуры:
+#   docker compose up -d postgres redis
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 BIN_DIR="$ROOT/.bin"
@@ -11,8 +14,33 @@ LOG_DIR="$ROOT/.logs"
 PID_DIR="$ROOT/.pids"
 
 JWT_SECRET="${JWT_SECRET:-local-dev-secret-$(openssl rand -hex 8)}"
+DATABASE_URL="${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/wb_analytics?sslmode=disable}"
+REDIS_URL="${REDIS_URL:-redis://localhost:6379}"
 
 mkdir -p "$BIN_DIR" "$LOG_DIR" "$PID_DIR"
+
+# --- Проверка зависимостей ---
+echo "Проверяю PostgreSQL..."
+if ! pg_isready -h localhost -p 5432 -q 2>/dev/null; then
+  echo "  PostgreSQL не доступен. Запускаю через docker compose..."
+  docker compose up -d postgres redis
+  echo "  Жду готовности PostgreSQL..."
+  for i in $(seq 1 15); do
+    pg_isready -h localhost -p 5432 -q 2>/dev/null && break
+    sleep 1
+  done
+  if ! pg_isready -h localhost -p 5432 -q 2>/dev/null; then
+    echo "  [!] PostgreSQL не запустился за 15 сек. Проверьте docker compose logs postgres"
+    exit 1
+  fi
+fi
+echo "  [✓] PostgreSQL доступен"
+
+echo "Проверяю Redis..."
+if ! redis-cli -u "$REDIS_URL" ping 2>/dev/null | grep -q PONG; then
+  echo "  [!] Redis не доступен (SEO кэш будет отключён)"
+fi
+echo ""
 
 # Порты сервисов
 declare -A PORTS=(
@@ -29,13 +57,13 @@ declare -A PORTS=(
 
 # Зависимые переменные окружения сервисов
 declare -A ENVS=(
-  [auth]="JWT_SECRET=$JWT_SECRET"
-  [collector]="JWT_SECRET=$JWT_SECRET AUTH_SERVICE_URL=http://localhost:8081"
+  [auth]="JWT_SECRET=$JWT_SECRET DATABASE_URL=$DATABASE_URL"
+  [collector]="JWT_SECRET=$JWT_SECRET DATABASE_URL=$DATABASE_URL AUTH_SERVICE_URL=http://localhost:8081"
   [stock-analytics]="JWT_SECRET=$JWT_SECRET COLLECTOR_SERVICE_URL=http://localhost:8082"
   [sales-analytics]="JWT_SECRET=$JWT_SECRET COLLECTOR_SERVICE_URL=http://localhost:8082"
   [competitor]="JWT_SECRET=$JWT_SECRET"
-  [seo]="JWT_SECRET=$JWT_SECRET"
-  [notifications]="JWT_SECRET=$JWT_SECRET"
+  [seo]="JWT_SECRET=$JWT_SECRET DATABASE_URL=$DATABASE_URL REDIS_URL=$REDIS_URL"
+  [notifications]="JWT_SECRET=$JWT_SECRET DATABASE_URL=$DATABASE_URL"
   [fashion-analytics]="JWT_SECRET=$JWT_SECRET COLLECTOR_SERVICE_URL=http://localhost:8082"
   [gateway]="JWT_SECRET=$JWT_SECRET \
     AUTH_SERVICE_URL=http://localhost:8081 \
@@ -101,6 +129,9 @@ echo ""
 echo "  API Gateway:  http://localhost:8080"
 echo "  Auth:         http://localhost:8081"
 echo "  Collector:    http://localhost:8082"
+echo ""
+echo "  PostgreSQL:   $DATABASE_URL"
+echo "  Redis:        $REDIS_URL"
 echo ""
 echo "  Логи:  tail -f .logs/<сервис>.log"
 echo "  Стоп:  Ctrl+C"
