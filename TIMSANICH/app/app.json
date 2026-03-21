@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "TIMSANICH Kids Edu",
+    "slug": "timsanich-kids-edu",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "timsanich",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4A9FE5"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.timsanich.kidsedu"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#4A9FE5",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.timsanich.kidsedu",
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-font"
+    ]
+  }
+}
