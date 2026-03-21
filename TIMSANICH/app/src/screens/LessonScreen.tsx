@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,28 @@ import {
   TouchableOpacity,
   Dimensions,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  FadeIn,
+  SlideInDown,
+} from 'react-native-reanimated';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../constants/theme';
-import { Button, ProgressBar, EmojiCircle } from '../components/ui';
+import {
+  DuoButton,
+  DuoOptionCard,
+  AnimatedProgressBar,
+  EmojiCircle,
+  CelebrationOverlay,
+  ResultFeedback,
+} from '../components/ui';
 import { useAppStore } from '../store/useAppStore';
 import { getLessonById } from '../data/lessons';
+import { getLessonMeta } from '../data/learningObjectives';
+import { hapticTap, hapticCelebration, hapticHeavy } from '../utils/haptics';
 
 const { width } = Dimensions.get('window');
 
@@ -31,30 +49,47 @@ export function LessonScreen({ lessonId, onComplete, onExit }: LessonScreenProps
   } = useAppStore();
 
   const lesson = getLessonById(lessonId);
+  const meta = getLessonMeta(lessonId);
   const [unitIndex, setUnitIndex] = useState(0);
   const [answerState, setAnswerState] = useState<AnswerState>('unanswered');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [score, setScore] = useState(0);
   const [showComplete, setShowComplete] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [consecutiveErrors, setConsecutiveErrors] = useState(0);
+
+  // Animation values
+  const questionOpacity = useSharedValue(0);
+  const questionY = useSharedValue(20);
+
+  useEffect(() => {
+    // Animate question in on each new unit
+    questionOpacity.value = 0;
+    questionY.value = 20;
+    questionOpacity.value = withDelay(100, withTiming(1, { duration: 300 }));
+    questionY.value = withDelay(100, withSpring(0, { damping: 14, stiffness: 200 }));
+  }, [unitIndex]);
 
   if (!lesson) return null;
 
   const unit = lesson.units[unitIndex];
   const progress = (unitIndex + (answerState !== 'unanswered' ? 1 : 0)) / lesson.units.length;
 
-  const handleAnswer = (optionId: string) => {
+  const handleAnswer = useCallback((optionId: string) => {
     if (answerState !== 'unanswered') return;
     setSelectedId(optionId);
 
     if (optionId === unit.correctAnswerId) {
       setAnswerState('correct');
       setScore((s) => s + 1);
+      setConsecutiveErrors(0);
     } else {
       setAnswerState('incorrect');
+      setConsecutiveErrors((c) => c + 1);
     }
-  };
+  }, [answerState, unit]);
 
-  const handleContinue = () => {
+  const handleContinue = useCallback(() => {
     if (unitIndex < lesson.units.length - 1) {
       setUnitIndex((i) => i + 1);
       setAnswerState('unanswered');
@@ -65,173 +100,231 @@ export function LessonScreen({ lessonId, onComplete, onExit }: LessonScreenProps
       updateLessonStatus(lessonId, 'completed');
       incrementStreak();
 
-      if (score === lesson.units.length) {
+      const isPerfect = score + (answerState === 'correct' ? 0 : -1) + 1 === lesson.units.length;
+
+      if (isPerfect) {
         addReward({
-          id: `star-${lessonId}`,
+          id: `star-${lessonId}-${Date.now()}`,
           type: 'star',
-          name: 'Perfect!',
+          name: 'Идеально!',
           emoji: '⭐',
           earnedAt: new Date().toISOString(),
-          description: `Perfect score on ${lesson.titleRu}`,
+          description: `Идеальный результат: ${lesson.titleRu}`,
         });
       }
 
-      setShowComplete(true);
+      // Show celebration first
+      setShowCelebration(true);
+      hapticCelebration();
+      setTimeout(() => {
+        setShowCelebration(false);
+        setShowComplete(true);
+      }, 2000);
     }
+  }, [unitIndex, lesson, score, answerState, lessonId]);
+
+  const getOptionState = (optionId: string) => {
+    if (answerState === 'unanswered') {
+      return selectedId === optionId ? 'selected' : 'default';
+    }
+    if (optionId === unit.correctAnswerId) return 'correct';
+    if (optionId === selectedId && answerState === 'incorrect') return 'incorrect';
+    return 'disabled';
   };
 
+  const getCorrectLabel = () => {
+    const correct = unit.options.find((o) => o.id === unit.correctAnswerId);
+    return correct ? correct.label : '';
+  };
+
+  const questionStyle = useAnimatedStyle(() => ({
+    opacity: questionOpacity.value,
+    transform: [{ translateY: questionY.value }],
+  }));
+
+  // Celebration overlay
+  if (showCelebration) {
+    const isPerfect = score === lesson.units.length;
+    return (
+      <SafeAreaView style={styles.container}>
+        <CelebrationOverlay
+          type={isPerfect ? 'perfect_score' : 'lesson_complete'}
+          emoji={isPerfect ? '🏆' : '🎉'}
+          title={isPerfect ? 'Идеально!' : 'Молодец!'}
+          subtitle={`${lesson.titleRu} пройден`}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  // Completion screen
   if (showComplete) {
+    const isPerfect = score === lesson.units.length;
+    const stars = score === lesson.units.length ? 3 : score >= lesson.units.length * 0.7 ? 2 : 1;
+
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.completeContainer}>
-          <Text style={styles.completeEmoji}>🎉</Text>
-          <Text style={styles.completeTitle}>Молодец!</Text>
-          <Text style={styles.completeSubtitle}>{lesson.titleRu}</Text>
+          {/* Stars */}
+          <View style={styles.starsRow}>
+            {[1, 2, 3].map((star) => (
+              <Animated.Text
+                key={star}
+                entering={FadeIn.delay(star * 200).springify()}
+                style={[
+                  styles.starIcon,
+                  star <= stars ? styles.starActive : styles.starInactive,
+                ]}
+              >
+                ⭐
+              </Animated.Text>
+            ))}
+          </View>
 
-          <View style={styles.scoreCard}>
-            <View style={styles.scoreRow}>
-              <Text style={styles.scoreEmoji}>⭐</Text>
+          <Animated.Text entering={FadeIn.delay(600)} style={styles.completeTitle}>
+            {isPerfect ? 'Идеально!' : 'Отлично!'}
+          </Animated.Text>
+
+          <Animated.Text entering={FadeIn.delay(800)} style={styles.completeSubtitle}>
+            {lesson.titleRu}
+          </Animated.Text>
+
+          {/* Score card */}
+          <Animated.View entering={SlideInDown.delay(1000).springify()} style={styles.scoreCard}>
+            <View style={styles.scoreItem}>
+              <Text style={styles.scoreEmoji}>✅</Text>
               <Text style={styles.scoreText}>
                 {score}/{lesson.units.length} правильно
               </Text>
             </View>
-            <View style={styles.scoreRow}>
+            <View style={styles.scoreDivider} />
+            <View style={styles.scoreItem}>
               <Text style={styles.scoreEmoji}>✨</Text>
               <Text style={styles.scoreText}>+{lesson.xpReward} XP</Text>
             </View>
-            {score === lesson.units.length && (
-              <View style={styles.scoreRow}>
-                <Text style={styles.scoreEmoji}>🏆</Text>
-                <Text style={styles.scoreText}>Идеальный результат!</Text>
-              </View>
+            {isPerfect && (
+              <>
+                <View style={styles.scoreDivider} />
+                <View style={styles.scoreItem}>
+                  <Text style={styles.scoreEmoji}>🏆</Text>
+                  <Text style={styles.scoreText}>Бонус за идеальный результат!</Text>
+                </View>
+              </>
             )}
-          </View>
+          </Animated.View>
 
-          <Button
-            title="Продолжить"
-            onPress={onComplete}
-            style={styles.continueButton}
-          />
-          <TouchableOpacity onPress={onExit} style={styles.exitLink}>
-            <Text style={styles.exitText}>На главную</Text>
-          </TouchableOpacity>
+          {/* Learning objective */}
+          {(lesson.learningObjectiveRu || meta.learningObjectiveRu) && (
+            <Animated.View entering={FadeIn.delay(1200)} style={styles.objectiveCard}>
+              <Text style={styles.objectiveLabel}>📘 Чему мы научились:</Text>
+              <Text style={styles.objectiveText}>{(lesson.learningObjectiveRu || meta.learningObjectiveRu)}</Text>
+            </Animated.View>
+          )}
+
+          {/* Parent follow-up */}
+          {(lesson.parentFollowUpRu || meta.parentFollowUpRu) && (
+            <Animated.View entering={FadeIn.delay(1400)} style={styles.parentCard}>
+              <Text style={styles.parentLabel}>👨‍👧 Совет родителю:</Text>
+              <Text style={styles.parentText}>{(lesson.parentFollowUpRu || meta.parentFollowUpRu)}</Text>
+            </Animated.View>
+          )}
+
+          {/* Buttons */}
+          <Animated.View entering={FadeIn.delay(1600)} style={styles.completeButtons}>
+            <DuoButton
+              title="Продолжить"
+              emoji="🚀"
+              onPress={onComplete}
+              variant="primary"
+              heavy
+              style={styles.continueBtn}
+            />
+            <TouchableOpacity onPress={onExit} style={styles.exitLink}>
+              <Text style={styles.exitText}>На главную</Text>
+            </TouchableOpacity>
+          </Animated.View>
         </View>
       </SafeAreaView>
     );
   }
 
+  // === Main lesson view ===
   const isWordRepeat = unit.type === 'word_repeat';
   const isParentTask = unit.type === 'parent_task';
+  const useListLayout = isWordRepeat || isParentTask || unit.options.length <= 2;
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Top Bar */}
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={onExit} style={styles.closeButton}>
+        <TouchableOpacity
+          onPress={() => { hapticTap(); onExit(); }}
+          style={styles.closeButton}
+        >
           <Text style={styles.closeIcon}>✕</Text>
         </TouchableOpacity>
         <View style={styles.progressBarContainer}>
-          <ProgressBar progress={progress} height={8} />
+          <AnimatedProgressBar progress={progress} height={12} />
         </View>
-        <Text style={styles.unitCount}>
-          {unitIndex + 1}/{lesson.units.length}
-        </Text>
       </View>
 
       <View style={styles.lessonContent}>
-        {/* Question */}
-        <View style={styles.questionSection}>
+        {/* Question Section */}
+        <Animated.View style={[styles.questionSection, questionStyle]}>
           {unit.emoji && (
             <EmojiCircle
               emoji={unit.emoji}
-              size={96}
+              size={100}
               backgroundColor={Colors.primaryLight}
-              style={styles.questionEmoji}
+              style={styles.questionEmojiCircle}
             />
           )}
           <Text style={styles.questionText}>{unit.questionRu}</Text>
+
+          {/* Hint */}
+          {unit.hintRu && answerState === 'unanswered' && (
+            <View style={styles.hintBadge}>
+              <Text style={styles.hintText}>💡 {unit.hintRu}</Text>
+            </View>
+          )}
+
+          {/* Parent note for parent_task */}
           {isParentTask && unit.parentNote && (
-            <View style={styles.parentNote}>
+            <View style={styles.parentNoteInline}>
               <Text style={styles.parentNoteLabel}>👨‍👧 Для родителя:</Text>
               <Text style={styles.parentNoteText}>{unit.parentNote}</Text>
             </View>
           )}
-        </View>
+        </Animated.View>
 
         {/* Options */}
-        <View style={styles.optionsGrid}>
-          {unit.options.map((option) => {
-            const isSelected = selectedId === option.id;
-            const isCorrect = option.id === unit.correctAnswerId;
-            const showCorrect =
-              answerState !== 'unanswered' && isCorrect;
-            const showIncorrect =
-              answerState === 'incorrect' && isSelected;
-
-            return (
-              <TouchableOpacity
-                key={option.id}
-                style={[
-                  styles.optionCard,
-                  isWordRepeat && styles.optionCardWide,
-                  isParentTask && styles.optionCardWide,
-                  showCorrect && styles.optionCorrect,
-                  showIncorrect && styles.optionIncorrect,
-                  isSelected &&
-                    answerState === 'unanswered' &&
-                    styles.optionSelected,
-                ]}
-                onPress={() => handleAnswer(option.id)}
-                disabled={answerState !== 'unanswered'}
-                activeOpacity={0.7}
-              >
-                {option.emoji && (
-                  <Text
-                    style={[
-                      styles.optionEmoji,
-                      (isWordRepeat || isParentTask) &&
-                        styles.optionEmojiSmall,
-                    ]}
-                  >
-                    {option.emoji}
-                  </Text>
-                )}
-                <Text
-                  style={[
-                    styles.optionLabel,
-                    showCorrect && styles.optionLabelCorrect,
-                    showIncorrect && styles.optionLabelIncorrect,
-                  ]}
-                >
-                  {option.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={[
+          styles.optionsContainer,
+          useListLayout ? styles.optionsList : styles.optionsGrid,
+        ]}>
+          {unit.options.map((option, i) => (
+            <DuoOptionCard
+              key={option.id}
+              emoji={option.emoji}
+              label={option.label}
+              onPress={() => handleAnswer(option.id)}
+              state={getOptionState(option.id) as any}
+              layout={useListLayout ? 'list' : 'grid'}
+              index={i}
+              disabled={answerState !== 'unanswered'}
+            />
+          ))}
         </View>
       </View>
 
-      {/* Bottom */}
+      {/* Result Feedback Bar */}
       {answerState !== 'unanswered' && (
-        <View
-          style={[
-            styles.resultBar,
-            answerState === 'correct'
-              ? styles.resultBarCorrect
-              : styles.resultBarIncorrect,
-          ]}
-        >
-          <Text style={styles.resultText}>
-            {answerState === 'correct' ? '✅ Правильно!' : '❌ Не совсем, попробуй ещё!'}
-          </Text>
-          <Button
-            title="Дальше"
-            onPress={handleContinue}
-            variant={answerState === 'correct' ? 'primary' : 'secondary'}
-            size="medium"
-            style={styles.nextButton}
-          />
-        </View>
+        <ResultFeedback
+          correct={answerState === 'correct'}
+          onContinue={handleContinue}
+          correctAnswer={answerState === 'incorrect' ? getCorrectLabel() : undefined}
+          teachingNote={unit.teachingNoteRu}
+        />
       )}
     </SafeAreaView>
   );
@@ -260,15 +353,10 @@ const styles = StyleSheet.create({
   closeIcon: {
     fontSize: 18,
     color: Colors.textSecondary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   progressBarContainer: {
     flex: 1,
-  },
-  unitCount: {
-    ...Typography.caption,
-    minWidth: 36,
-    textAlign: 'right',
   },
   lessonContent: {
     flex: 1,
@@ -277,9 +365,9 @@ const styles = StyleSheet.create({
   },
   questionSection: {
     alignItems: 'center',
-    marginBottom: Spacing.xxxl,
+    marginBottom: Spacing.xxl,
   },
-  questionEmoji: {
+  questionEmojiCircle: {
     marginBottom: Spacing.lg,
   },
   questionText: {
@@ -287,99 +375,46 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 32,
   },
-  parentNote: {
+  hintBadge: {
+    backgroundColor: Colors.rewardGoldLight,
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xxs,
+    marginTop: Spacing.sm,
+  },
+  hintText: {
+    ...Typography.bodyS,
+    color: Colors.warningAmber,
+    fontWeight: '600',
+  },
+  parentNoteInline: {
     backgroundColor: Colors.primaryLight,
     borderRadius: Radius.lg,
     padding: Spacing.md,
     marginTop: Spacing.lg,
     width: '100%',
+    gap: Spacing.xxs,
   },
   parentNoteLabel: {
     ...Typography.bodyS,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.primary,
-    marginBottom: Spacing.xxs,
   },
   parentNoteText: {
     ...Typography.bodyM,
     color: Colors.textPrimary,
     lineHeight: 22,
   },
+  optionsContainer: {
+    gap: Spacing.sm,
+  },
   optionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: Spacing.sm,
   },
-  optionCard: {
-    width: (width - Spacing.lg * 2 - Spacing.sm) / 2,
-    backgroundColor: Colors.cream,
-    borderRadius: Radius.xl,
-    padding: Spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 120,
-    borderWidth: 3,
-    borderColor: 'transparent',
-  },
-  optionCardWide: {
-    width: '100%',
-    minHeight: 72,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: Spacing.sm,
-  },
-  optionCorrect: {
-    backgroundColor: Colors.successLight,
-    borderColor: Colors.successGreen,
-  },
-  optionIncorrect: {
-    backgroundColor: Colors.errorLight,
-    borderColor: Colors.errorRed,
-  },
-  optionSelected: {
-    borderColor: Colors.primary,
-  },
-  optionEmoji: {
-    fontSize: 44,
-    marginBottom: Spacing.xs,
-  },
-  optionEmojiSmall: {
-    fontSize: 32,
-    marginBottom: 0,
-  },
-  optionLabel: {
-    ...Typography.bodyL,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  optionLabelCorrect: {
-    color: Colors.successGreen,
-  },
-  optionLabelIncorrect: {
-    color: Colors.errorRed,
-  },
-  resultBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.md,
-    paddingBottom: Spacing.xl,
-  },
-  resultBarCorrect: {
-    backgroundColor: Colors.successLight,
-  },
-  resultBarIncorrect: {
-    backgroundColor: Colors.errorLight,
-  },
-  resultText: {
-    ...Typography.bodyL,
-    fontWeight: '600',
-    flex: 1,
-  },
-  nextButton: {
-    minWidth: 100,
+  optionsList: {
+    flexDirection: 'column',
   },
   // Complete screen
   completeContainer: {
@@ -388,9 +423,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: Spacing.lg,
   },
-  completeEmoji: {
-    fontSize: 80,
+  starsRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
     marginBottom: Spacing.lg,
+  },
+  starIcon: {
+    fontSize: 48,
+  },
+  starActive: {
+    opacity: 1,
+  },
+  starInactive: {
+    opacity: 0.2,
   },
   completeTitle: {
     ...Typography.headingXL,
@@ -399,18 +444,18 @@ const styles = StyleSheet.create({
   completeSubtitle: {
     ...Typography.bodyL,
     color: Colors.textSecondary,
-    marginBottom: Spacing.xxl,
+    marginBottom: Spacing.xl,
   },
   scoreCard: {
     backgroundColor: Colors.cream,
     borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    gap: Spacing.md,
+    padding: Spacing.lg,
     width: '100%',
-    maxWidth: 300,
-    marginBottom: Spacing.xxl,
+    maxWidth: 320,
+    gap: Spacing.md,
+    marginBottom: Spacing.md,
   },
-  scoreRow: {
+  scoreItem: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
@@ -422,12 +467,57 @@ const styles = StyleSheet.create({
   },
   scoreText: {
     ...Typography.bodyL,
-    fontWeight: '600',
+    fontWeight: '700',
+    flex: 1,
   },
-  continueButton: {
+  scoreDivider: {
+    height: 1,
+    backgroundColor: Colors.border,
+  },
+  objectiveCard: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
     width: '100%',
-    maxWidth: 300,
-    marginBottom: Spacing.md,
+    maxWidth: 320,
+    gap: Spacing.xxs,
+    marginBottom: Spacing.sm,
+  },
+  objectiveLabel: {
+    ...Typography.bodyS,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  objectiveText: {
+    ...Typography.bodyM,
+    color: Colors.textPrimary,
+  },
+  parentCard: {
+    backgroundColor: Colors.rewardGoldLight,
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    width: '100%',
+    maxWidth: 320,
+    gap: Spacing.xxs,
+    marginBottom: Spacing.lg,
+  },
+  parentLabel: {
+    ...Typography.bodyS,
+    fontWeight: '700',
+    color: Colors.warningAmber,
+  },
+  parentText: {
+    ...Typography.bodyM,
+    color: Colors.textPrimary,
+  },
+  completeButtons: {
+    width: '100%',
+    maxWidth: 320,
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  continueBtn: {
+    width: '100%',
   },
   exitLink: {
     padding: Spacing.sm,

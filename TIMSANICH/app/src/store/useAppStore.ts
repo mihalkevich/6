@@ -139,6 +139,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     totalXP: 0,
     completedLessonIds: [],
     currentPathPosition: 0,
+    skillLevels: {},
+    learnedWords: [],
+    accuracyByType: {},
   },
   completeLesson: (lessonId, xp) =>
     set((s) => {

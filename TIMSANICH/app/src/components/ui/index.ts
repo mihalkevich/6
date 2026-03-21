@@ -1,5 +1,10 @@
 export { Button } from './Button';
 export { Card } from './Card';
 export { ProgressBar } from './ProgressBar';
+export { AnimatedProgressBar } from './AnimatedProgressBar';
 export { EmojiCircle } from './EmojiCircle';
 export { StreakBadge } from './StreakBadge';
+export { DuoButton } from './DuoButton';
+export { DuoOptionCard } from './DuoOptionCard';
+export { CelebrationOverlay } from './CelebrationOverlay';
+export { ResultFeedback } from './ResultFeedback';

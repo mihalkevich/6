@@ -1,3 +1,5 @@
+import type { SkillDomain } from '../data/curriculum';
+
 export type AgeGroup = 3 | 4 | 5;
 
 export type DevelopmentGoal =
@@ -16,14 +18,23 @@ export type FocusArea =
   | 'parent_tasks';
 
 export type LessonType =
-  | 'image_choice'
-  | 'word_repeat'
-  | 'match_pair'
-  | 'find_odd'
-  | 'emotion_pick'
-  | 'sequence'
-  | 'memory_cards'
-  | 'parent_task';
+  | 'image_choice'       // выбери правильную картинку
+  | 'word_repeat'        // повтори слово
+  | 'match_pair'         // соедини слово и картинку
+  | 'find_odd'           // найди лишнее
+  | 'emotion_pick'       // определи эмоцию
+  | 'sequence'           // продолжи последовательность
+  | 'memory_cards'       // найди пары
+  | 'parent_task'        // задание с родителем
+  | 'counting'           // сосчитай предметы
+  | 'sorting'            // рассортируй по группам
+  | 'first_sound'        // определи первый звук
+  | 'syllable_clap'      // посчитай слоги
+  | 'spatial'            // где находится предмет
+  | 'association'        // что подходит друг к другу
+  | 'opposite'           // найди противоположное
+  | 'story_order'        // расставь по порядку
+  | 'compare_quantity';  // где больше
 
 export type LessonStatus = 'locked' | 'available' | 'in_progress' | 'completed';
 
@@ -73,7 +84,10 @@ export interface LessonUnit {
   options: LessonOption[];
   correctAnswerId: string;
   hint?: string;
+  hintRu?: string;
   parentNote?: string;
+  /** Educational context shown to parent after answer */
+  teachingNoteRu?: string;
 }
 
 export interface LessonOption {
@@ -99,6 +113,16 @@ export interface Lesson {
   requiredLessonIds: string[];
   xpReward: number;
   emoji: string;
+  /** Primary skill this lesson develops */
+  primarySkill?: SkillDomain;
+  /** Secondary skills this lesson touches */
+  secondarySkills?: SkillDomain[];
+  /** What the child should be able to do after this lesson */
+  learningObjectiveRu?: string;
+  /** Guidance for parent after lesson */
+  parentFollowUpRu?: string;
+  /** Words/concepts introduced in this lesson */
+  newWords?: string[];
 }
 
 export interface PathNode {
@@ -119,6 +143,10 @@ export interface DailyPlan {
   summary: string;
   summaryRu: string;
   completed: boolean;
+  /** Learning focus explanation for parent */
+  learningFocusRu: string;
+  /** Skills being developed today */
+  todaySkills: SkillDomain[];
 }
 
 export interface PlannedLesson {
@@ -134,6 +162,18 @@ export interface Progress {
   totalXP: number;
   completedLessonIds: string[];
   currentPathPosition: number;
+  /** Tracks per-skill progress (0-100) */
+  skillLevels: Partial<Record<SkillDomain, number>>;
+  /** Words the child has learned */
+  learnedWords: string[];
+  /** Accuracy history per lesson type for adaptive difficulty */
+  accuracyByType: Partial<Record<LessonType, AccuracyRecord>>;
+}
+
+export interface AccuracyRecord {
+  totalAttempts: number;
+  correctAttempts: number;
+  lastAttemptDate: string;
 }
 
 export interface WeeklyStats {
@@ -142,6 +182,28 @@ export interface WeeklyStats {
   minutesSpent: number;
   newWordsLearned: number;
   streakDays: number;
+  skillsImproved: SkillDomain[];
+}
+
+/** Spaced repetition item for review scheduling */
+export interface ReviewItem {
+  /** The lesson unit ID to review */
+  unitId: string;
+  lessonId: string;
+  /** The word or concept being reviewed */
+  word: string;
+  /** Current interval in days (SM-2 inspired) */
+  interval: number;
+  /** Ease factor (2.5 default, adjusted by performance) */
+  easeFactor: number;
+  /** Number of consecutive correct answers */
+  repetitionCount: number;
+  /** Next scheduled review date */
+  nextReviewDate: string;
+  /** Last review date */
+  lastReviewDate: string;
+  /** How many times reviewed total */
+  totalReviews: number;
 }
 
 export interface OnboardingState {

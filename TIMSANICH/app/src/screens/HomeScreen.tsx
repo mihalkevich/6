@@ -8,9 +8,10 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../constants/theme';
-import { Card, Button, ProgressBar, StreakBadge, EmojiCircle } from '../components/ui';
+import { Card, DuoButton, AnimatedProgressBar, StreakBadge, EmojiCircle } from '../components/ui';
 import { useAppStore } from '../store/useAppStore';
 import { getLessonById } from '../data/lessons';
+import { hapticTap, hapticPress } from '../utils/haptics';
 
 interface HomeScreenProps {
   onStartLesson: (lessonId: string) => void;
@@ -67,10 +68,10 @@ export function HomeScreen({ onStartLesson }: HomeScreenProps) {
               {completedToday}/{totalToday}
             </Text>
           </View>
-          <ProgressBar
+          <AnimatedProgressBar
             progress={dailyProgress}
             color={dailyProgress >= 1 ? Colors.successGreen : Colors.primary}
-            height={10}
+            height={12}
           />
           {dailyProgress >= 1 ? (
             <Text style={styles.dailyComplete}>Все уроки выполнены! 🎉</Text>
@@ -80,6 +81,13 @@ export function HomeScreen({ onStartLesson }: HomeScreenProps) {
             </Text>
           )}
         </Card>
+
+        {/* Learning Focus */}
+        {currentPlan?.learningFocusRu && (
+          <View style={styles.focusBadge}>
+            <Text style={styles.focusText}>🎯 {currentPlan.learningFocusRu}</Text>
+          </View>
+        )}
 
         {/* Today's Lessons */}
         <Text style={styles.sectionTitle}>Уроки на сегодня</Text>
@@ -146,7 +154,7 @@ export function HomeScreen({ onStartLesson }: HomeScreenProps) {
 
         {/* Start CTA */}
         {dailyProgress < 1 && (
-          <Button
+          <DuoButton
             title="Начать урок"
             emoji="🚀"
             onPress={() => {
@@ -155,6 +163,8 @@ export function HomeScreen({ onStartLesson }: HomeScreenProps) {
               );
               if (next) onStartLesson(next.lessonId);
             }}
+            variant="primary"
+            heavy
             style={styles.startButton}
           />
         )}
@@ -237,6 +247,18 @@ const styles = StyleSheet.create({
   dailyCount: {
     ...Typography.headingS,
     color: Colors.primary,
+  },
+  focusBadge: {
+    backgroundColor: Colors.primaryLight,
+    borderRadius: Radius.lg,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    marginBottom: Spacing.md,
+  },
+  focusText: {
+    ...Typography.bodyS,
+    color: Colors.primary,
+    fontWeight: '600',
   },
   dailyComplete: {
     ...Typography.bodyS,

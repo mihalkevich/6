@@ -1,6 +1,8 @@
 import { format } from 'date-fns';
 import type { Child, DailyPlan, PlannedLesson } from '../types';
 import { getLessonsForAge } from '../data/lessons';
+import { getLessonMeta } from '../data/learningObjectives';
+import type { SkillDomain } from '../data/curriculum';
 
 const parentTips = [
   {
@@ -110,6 +112,37 @@ export function generateDailyPlan(
 
   const tipIndex = Math.floor(Math.random() * parentTips.length);
 
+  // Collect skills being developed today
+  const todaySkills: SkillDomain[] = [];
+  for (const p of planned) {
+    const m = getLessonMeta(p.lessonId);
+    if (!todaySkills.includes(m.primarySkill)) {
+      todaySkills.push(m.primarySkill);
+    }
+  }
+
+  const skillNames = todaySkills
+    .slice(0, 3)
+    .map((s) => {
+      const names: Record<string, string> = {
+        vocabulary: 'словарный запас',
+        receptive_language: 'понимание речи',
+        expressive_language: 'активная речь',
+        classification: 'классификация',
+        visual_perception: 'восприятие',
+        logical_thinking: 'логика',
+        attention: 'внимание',
+        working_memory: 'память',
+        counting: 'счёт',
+        emotional_intelligence: 'эмоции',
+        spatial_awareness: 'пространство',
+        phonological_awareness: 'звуки',
+        social_skills: 'общение',
+        fine_motor: 'моторика',
+      };
+      return names[s] || s;
+    });
+
   return {
     id: `plan-${format(new Date(), 'yyyy-MM-dd')}`,
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -119,5 +152,7 @@ export function generateDailyPlan(
     summary: `Today: ${planned.length} lessons for ${child.name}`,
     summaryRu: `Сегодня: ${planned.length} уроков для ${child.name}`,
     completed: false,
+    learningFocusRu: `Сегодня развиваем: ${skillNames.join(', ')}`,
+    todaySkills,
   };
 }

@@ -12,6 +12,7 @@ import {
 } from './src/screens';
 import { useAppStore } from './src/store/useAppStore';
 import { Colors, Spacing, Shadows } from './src/constants/theme';
+import { hapticSelection } from './src/utils/haptics';
 
 type Tab = 'home' | 'path' | 'progress' | 'profile';
 
@@ -83,7 +84,7 @@ export default function App() {
               <TouchableOpacity
                 key={tab.id}
                 style={styles.tabItem}
-                onPress={() => setActiveTab(tab.id)}
+                onPress={() => { hapticSelection(); setActiveTab(tab.id); }}
                 activeOpacity={0.7}
               >
                 <Text style={[styles.tabEmoji, isActive && styles.tabEmojiActive]}>
