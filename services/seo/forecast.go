@@ -15,18 +15,18 @@ type forecastRequest struct {
 }
 
 type keywordForecast struct {
-	Keyword         string  `json:"keyword"`
-	CurrentPos      int     `json:"current_position"`
-	PredictedPos    int     `json:"predicted_position"`     // 7-day forecast
-	Trend           string  `json:"trend"`                  // improving, declining, stable, volatile, new
-	Velocity        float64 `json:"velocity"`               // positions per day (negative = improving)
-	Confidence      string  `json:"confidence"`             // high, medium, low
-	DataPoints      int     `json:"data_points"`
-	BestPos         int     `json:"best_position"`
-	WorstPos        int     `json:"worst_position"`
-	AvgPos          float64 `json:"avg_position"`
-	StdDev          float64 `json:"std_dev"`
-	DaysTracked     int     `json:"days_tracked"`
+	Keyword      string  `json:"keyword"`
+	CurrentPos   int     `json:"current_position"`
+	PredictedPos int     `json:"predicted_position"`
+	Trend        string  `json:"trend"`
+	Velocity     float64 `json:"velocity"`
+	Confidence   string  `json:"confidence"`
+	DataPoints   int     `json:"data_points"`
+	BestPos      int     `json:"best_position"`
+	WorstPos     int     `json:"worst_position"`
+	AvgPos       float64 `json:"avg_position"`
+	StdDev       float64 `json:"std_dev"`
+	DaysTracked  int     `json:"days_tracked"`
 }
 
 type forecastResponse struct {
@@ -54,9 +54,7 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mu.RLock()
-	kwMap := positionHistory[req.NmID]
-	mu.RUnlock()
+	kwMap := getPositionHistory(req.NmID)
 
 	if kwMap == nil {
 		jsonResponse(w, http.StatusOK, forecastResponse{NmID: req.NmID})
@@ -67,10 +65,17 @@ func handleForecast(w http.ResponseWriter, r *http.Request) {
 	var summary forecastSummary
 
 	for kw, records := range kwMap {
-		if len(records) == 0 {
+		// Filter out placeholder records
+		var real []positionRecord
+		for _, r := range records {
+			if r.Position > 0 {
+				real = append(real, r)
+			}
+		}
+		if len(real) == 0 {
 			continue
 		}
-		fc := analyzeKeywordTrend(kw, records)
+		fc := analyzeKeywordTrend(kw, real)
 		forecasts = append(forecasts, fc)
 
 		switch fc.Trend {
@@ -110,7 +115,6 @@ func analyzeKeywordTrend(keyword string, records []positionRecord) keywordForeca
 		return fc
 	}
 
-	// Basic stats.
 	positions := make([]float64, len(records))
 	best, worst := records[0].Position, records[0].Position
 	var sum float64
@@ -131,7 +135,6 @@ func analyzeKeywordTrend(keyword string, records []positionRecord) keywordForeca
 	fc.WorstPos = worst
 	fc.AvgPos = sum / float64(len(records))
 
-	// Standard deviation.
 	var variance float64
 	for _, p := range positions {
 		diff := p - fc.AvgPos
@@ -141,23 +144,17 @@ func analyzeKeywordTrend(keyword string, records []positionRecord) keywordForeca
 		fc.StdDev = math.Sqrt(variance / float64(len(positions)-1))
 	}
 
-	// Days tracked.
 	first := records[0].CheckedAt
 	last := records[len(records)-1].CheckedAt
 	fc.DaysTracked = int(last.Sub(first).Hours()/24) + 1
 
-	// Velocity: linear regression of position over time.
 	if len(records) >= 2 {
 		fc.Velocity = calculateVelocity(records)
 	}
 
-	// Trend classification.
 	fc.Trend = classifyTrend(fc.Velocity, fc.StdDev, len(records))
-
-	// Confidence level.
 	fc.Confidence = assessConfidence(len(records), fc.DaysTracked, fc.StdDev)
 
-	// 7-day forecast via linear extrapolation.
 	if len(records) >= 2 {
 		predicted := float64(fc.CurrentPos) + fc.Velocity*7
 		if predicted < 1 {
@@ -171,20 +168,17 @@ func analyzeKeywordTrend(keyword string, records []positionRecord) keywordForeca
 	return fc
 }
 
-// calculateVelocity uses linear regression (least squares) to compute
-// position change per day. Negative = improving (position number decreasing).
 func calculateVelocity(records []positionRecord) float64 {
 	if len(records) < 2 {
 		return 0
 	}
 
-	// Use time since first record as X (in days), position as Y.
 	t0 := records[0].CheckedAt
 	n := float64(len(records))
 
 	var sumX, sumY, sumXY, sumX2 float64
 	for _, r := range records {
-		x := r.CheckedAt.Sub(t0).Hours() / 24 // days since first check
+		x := r.CheckedAt.Sub(t0).Hours() / 24
 		y := float64(r.Position)
 		sumX += x
 		sumY += y
@@ -197,7 +191,6 @@ func calculateVelocity(records []positionRecord) float64 {
 		return 0
 	}
 
-	// Slope = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX)
 	slope := (n*sumXY - sumX*sumY) / denom
 	return slope
 }
@@ -207,7 +200,6 @@ func classifyTrend(velocity, stdDev float64, dataPoints int) string {
 		return "new"
 	}
 
-	// High std dev relative to velocity = volatile.
 	if stdDev > 15 && math.Abs(velocity) < stdDev*0.3 {
 		return "volatile"
 	}
@@ -225,7 +217,6 @@ func classifyTrend(velocity, stdDev float64, dataPoints int) string {
 func assessConfidence(dataPoints, daysTracked int, stdDev float64) string {
 	score := 0
 
-	// More data points = higher confidence.
 	switch {
 	case dataPoints >= 14:
 		score += 3
@@ -235,7 +226,6 @@ func assessConfidence(dataPoints, daysTracked int, stdDev float64) string {
 		score += 1
 	}
 
-	// More days = higher confidence.
 	switch {
 	case daysTracked >= 14:
 		score += 3
@@ -245,7 +235,6 @@ func assessConfidence(dataPoints, daysTracked int, stdDev float64) string {
 		score += 1
 	}
 
-	// Lower std dev = higher confidence.
 	switch {
 	case stdDev < 5:
 		score += 2
@@ -267,9 +256,9 @@ func assessConfidence(dataPoints, daysTracked int, stdDev float64) string {
 
 type enhancedHistoryRequest struct {
 	NmID     int64  `json:"nm_id"`
-	DateFrom string `json:"date_from,omitempty"` // YYYY-MM-DD
-	DateTo   string `json:"date_to,omitempty"`   // YYYY-MM-DD
-	Keyword  string `json:"keyword,omitempty"`   // filter single keyword
+	DateFrom string `json:"date_from,omitempty"`
+	DateTo   string `json:"date_to,omitempty"`
+	Keyword  string `json:"keyword,omitempty"`
 }
 
 type enhancedHistoryEntry struct {
@@ -293,7 +282,6 @@ func handleEnhancedHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse date filters.
 	var dateFrom, dateTo time.Time
 	var hasFrom, hasTo bool
 	if req.DateFrom != "" {
@@ -306,14 +294,12 @@ func handleEnhancedHistory(w http.ResponseWriter, r *http.Request) {
 	if req.DateTo != "" {
 		t, err := time.Parse("2006-01-02", req.DateTo)
 		if err == nil {
-			dateTo = t.Add(24*time.Hour - time.Nanosecond) // end of day
+			dateTo = t.Add(24*time.Hour - time.Nanosecond)
 			hasTo = true
 		}
 	}
 
-	mu.RLock()
-	kwMap := positionHistory[req.NmID]
-	mu.RUnlock()
+	kwMap := getPositionHistory(req.NmID)
 
 	var entries []enhancedHistoryEntry
 	for kw, records := range kwMap {
@@ -321,9 +307,11 @@ func handleEnhancedHistory(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Apply date filter.
 		var filtered []positionRecord
 		for _, rec := range records {
+			if rec.Position == 0 {
+				continue // skip placeholders
+			}
 			if hasFrom && rec.CheckedAt.Before(dateFrom) {
 				continue
 			}
@@ -343,7 +331,6 @@ func handleEnhancedHistory(w http.ResponseWriter, r *http.Request) {
 			DataPoints: len(filtered),
 		}
 
-		// Stats.
 		best, worst := filtered[0].Position, filtered[0].Position
 		for _, r := range filtered {
 			if r.Position < best {
@@ -356,7 +343,6 @@ func handleEnhancedHistory(w http.ResponseWriter, r *http.Request) {
 		entry.BestPos = best
 		entry.WorstPos = worst
 
-		// Trend and velocity.
 		if len(filtered) >= 2 {
 			entry.Velocity = calculateVelocity(filtered)
 			entry.Trend = classifyTrend(entry.Velocity, 0, len(filtered))

@@ -1,6 +1,32 @@
-version: "3.9"
-
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=wb_analytics
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   gateway:
     build:
       context: .
@@ -38,6 +64,10 @@ services:
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/wb_analytics?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   collector:
     build:
@@ -49,6 +79,10 @@ services:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
       - AUTH_SERVICE_URL=http://auth:8080
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/wb_analytics?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   stock-analytics:
     build:
@@ -91,6 +125,13 @@ services:
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/wb_analytics?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   notifications:
     build:
@@ -101,6 +142,10 @@ services:
     environment:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/wb_analytics?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   fashion-analytics:
     build:
@@ -123,3 +168,7 @@ services:
       - NEXT_PUBLIC_API_URL=http://gateway:8080
     depends_on:
       - gateway
+
+volumes:
+  pgdata:
+  redisdata:

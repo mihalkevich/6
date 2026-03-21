@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -17,7 +18,7 @@ import (
 type regionCheckRequest struct {
 	NmIDs    []int64  `json:"nm_ids"`
 	Keywords []string `json:"keywords"`
-	Regions  []string `json:"regions,omitempty"` // region names; empty = all known regions
+	Regions  []string `json:"regions,omitempty"`
 }
 
 type regionPositionResult struct {
@@ -30,11 +31,11 @@ type regionPositionResult struct {
 }
 
 type regionSummary struct {
-	NmID     int64              `json:"nm_id"`
-	Keyword  string             `json:"keyword"`
-	BestPos  int                `json:"best_position"`
-	WorstPos int                `json:"worst_position"`
-	AvgPos   float64            `json:"avg_position"`
+	NmID     int64                `json:"nm_id"`
+	Keyword  string               `json:"keyword"`
+	BestPos  int                  `json:"best_position"`
+	WorstPos int                  `json:"worst_position"`
+	AvgPos   float64              `json:"avg_position"`
 	ByRegion []regionPositionResult `json:"by_region"`
 }
 
@@ -49,7 +50,6 @@ func handleCheckPositionsRegional(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve regions.
 	regions := resolveRegions(req.Regions)
 	if len(regions) == 0 {
 		httpError(w, "no valid regions specified", http.StatusBadRequest)
@@ -62,7 +62,6 @@ func handleCheckPositionsRegional(w http.ResponseWriter, r *http.Request) {
 		nmIDSet[id] = true
 	}
 
-	// Run searches: one goroutine per keyword×region combination.
 	type result struct {
 		items []regionPositionResult
 	}
@@ -91,7 +90,6 @@ func handleCheckPositionsRegional(w http.ResponseWriter, r *http.Request) {
 		allResults = append(allResults, r.items...)
 	}
 
-	// Build summaries: group by nmID+keyword.
 	summaries := buildRegionSummaries(allResults)
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
@@ -129,7 +127,6 @@ func searchRegion(client *wbapi.Client, keyword string, region wbapi.Region, nmI
 		}
 	}
 
-	// Mark not found.
 	for nmID := range nmIDSet {
 		if !found[nmID] {
 			results = append(results, regionPositionResult{
@@ -143,16 +140,19 @@ func searchRegion(client *wbapi.Client, keyword string, region wbapi.Region, nmI
 	return results
 }
 
-// cachedSearchRegion wraps cachedSearchProducts with region support.
+// cachedSearchRegion wraps search with Redis cache support.
 func cachedSearchRegion(client *wbapi.Client, keyword string, page, dest int) *wbapi.WBSearchResult {
-	cacheKey := fmt.Sprintf("%s:%d:%d", keyword, page, dest)
+	cacheKey := fmt.Sprintf("wb:search:%s:%d:%d", keyword, page, dest)
 
-	cacheMu.RLock()
-	cached, ok := searchCache[cacheKey]
-	cacheMu.RUnlock()
-
-	if ok && time.Since(cached.fetchedAt) < searchCacheTTL {
-		return cached.result
+	// Try Redis cache
+	if rdb != nil {
+		cached, err := rdb.Get(context.Background(), cacheKey).Bytes()
+		if err == nil {
+			var result wbapi.WBSearchResult
+			if json.Unmarshal(cached, &result) == nil {
+				return &result
+			}
+		}
 	}
 
 	jitter := time.Duration(rand.Int63n(int64(rateLimitJitter)))
@@ -164,9 +164,12 @@ func cachedSearchRegion(client *wbapi.Client, keyword string, page, dest int) *w
 		return nil
 	}
 
-	cacheMu.Lock()
-	searchCache[cacheKey] = cachedSearch{result: result, fetchedAt: time.Now()}
-	cacheMu.Unlock()
+	// Cache in Redis
+	if rdb != nil {
+		if data, err := json.Marshal(result); err == nil {
+			rdb.Set(context.Background(), cacheKey, data, searchCacheTTL)
+		}
+	}
 
 	return result
 }
@@ -242,7 +245,6 @@ func regionNames(regions []wbapi.Region) []string {
 	return names
 }
 
-// handleListRegions returns the list of available regions.
 func handleListRegions(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"regions": wbapi.KnownRegions,

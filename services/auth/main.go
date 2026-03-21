@@ -1,48 +1,51 @@
 package main
 
 import (
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/wb-analytics/wb-seller-tools/pkg/config"
+	"github.com/wb-analytics/wb-seller-tools/pkg/database"
 	"github.com/wb-analytics/wb-seller-tools/pkg/middleware"
 	"golang.org/x/crypto/bcrypt"
 )
 
-// In-memory store for simplicity; swap for PostgreSQL in production.
+//go:embed migrations.sql
+var migrationSQL string
+
 var (
-	users   = map[string]*userRecord{} // email -> user
-	apiKeys = map[int64][]*apiKeyRecord{} // userID -> keys
-	nextID  int64
-	cfg     *config.Config
+	cfg *config.Config
+	db  *pgxpool.Pool
 )
-
-type userRecord struct {
-	ID           int64  `json:"id"`
-	Email        string `json:"email"`
-	Name         string `json:"name"`
-	PasswordHash string `json:"-"`
-}
-
-type apiKeyRecord struct {
-	ID             int64  `json:"id"`
-	UserID         int64  `json:"user_id"`
-	Name           string `json:"name"`
-	TokenEncrypted string `json:"-"`
-	IsActive       bool   `json:"is_active"`
-}
 
 func main() {
 	cfg = config.Load()
+	ctx := context.Background()
+
+	var err error
+	db, err = database.ConnectPostgres(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	if err := database.RunMigrations(ctx, db, migrationSQL); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
 
 	mux := http.NewServeMux()
 
@@ -86,10 +89,6 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "email and password required", http.StatusBadRequest)
 		return
 	}
-	if _, exists := users[req.Email]; exists {
-		httpError(w, "user already exists", http.StatusConflict)
-		return
-	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -97,11 +96,18 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nextID++
-	u := &userRecord{ID: nextID, Email: req.Email, Name: req.Name, PasswordHash: string(hash)}
-	users[req.Email] = u
+	var userID int64
+	err = db.QueryRow(r.Context(),
+		`INSERT INTO users (email, name, password_hash) VALUES ($1, $2, $3)
+		 RETURNING id`,
+		req.Email, req.Name, string(hash),
+	).Scan(&userID)
+	if err != nil {
+		httpError(w, "user already exists", http.StatusConflict)
+		return
+	}
 
-	token, err := generateJWT(u.ID)
+	token, err := generateJWT(userID)
 	if err != nil {
 		httpError(w, "internal error", http.StatusInternalServerError)
 		return
@@ -109,7 +115,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 
 	jsonResponse(w, http.StatusCreated, map[string]interface{}{
 		"token": token,
-		"user":  map[string]interface{}{"id": u.ID, "email": u.Email, "name": u.Name},
+		"user":  map[string]interface{}{"id": userID, "email": req.Email, "name": req.Name},
 	})
 }
 
@@ -125,18 +131,22 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, exists := users[req.Email]
-	if !exists {
+	var userID int64
+	var name, passwordHash string
+	err := db.QueryRow(r.Context(),
+		`SELECT id, name, password_hash FROM users WHERE email = $1`, req.Email,
+	).Scan(&userID, &name, &passwordHash)
+	if err != nil {
 		httpError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(req.Password)); err != nil {
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
 		httpError(w, "invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	token, err := generateJWT(u.ID)
+	token, err := generateJWT(userID)
 	if err != nil {
 		httpError(w, "internal error", http.StatusInternalServerError)
 		return
@@ -144,21 +154,24 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"token": token,
-		"user":  map[string]interface{}{"id": u.ID, "email": u.Email, "name": u.Name},
+		"user":  map[string]interface{}{"id": userID, "email": req.Email, "name": name},
 	})
 }
 
 func handleMe(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
-	for _, u := range users {
-		if u.ID == userID {
-			jsonResponse(w, http.StatusOK, map[string]interface{}{
-				"id": u.ID, "email": u.Email, "name": u.Name,
-			})
-			return
-		}
+
+	var email, name string
+	err := db.QueryRow(r.Context(),
+		`SELECT email, name FROM users WHERE id = $1`, userID,
+	).Scan(&email, &name)
+	if err != nil {
+		httpError(w, "user not found", http.StatusNotFound)
+		return
 	}
-	httpError(w, "user not found", http.StatusNotFound)
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"id": userID, "email": email, "name": name,
+	})
 }
 
 type addKeyRequest struct {
@@ -175,7 +188,6 @@ func handleAddKey(w http.ResponseWriter, r *http.Request) {
 		httpError(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	// Accept both "token" and "wb_token" fields
 	tok := req.Token
 	if tok == "" {
 		tok = req.WBToken
@@ -191,35 +203,48 @@ func handleAddKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	nextID++
-	key := &apiKeyRecord{
-		ID:             nextID,
-		UserID:         userID,
-		Name:           req.Name,
-		TokenEncrypted: encrypted,
-		IsActive:       true,
+	var keyID int64
+	err = db.QueryRow(r.Context(),
+		`INSERT INTO api_keys (user_id, name, token_encrypted) VALUES ($1, $2, $3) RETURNING id`,
+		userID, req.Name, encrypted,
+	).Scan(&keyID)
+	if err != nil {
+		httpError(w, "failed to save key", http.StatusInternalServerError)
+		return
 	}
-	apiKeys[userID] = append(apiKeys[userID], key)
 
 	jsonResponse(w, http.StatusCreated, map[string]interface{}{
-		"id": key.ID, "name": key.Name, "is_active": key.IsActive,
+		"id": keyID, "name": req.Name, "is_active": true,
 	})
 }
 
 func handleListKeys(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
-	keys := apiKeys[userID]
-	result := make([]map[string]interface{}, 0, len(keys))
-	for _, k := range keys {
+
+	rows, err := db.Query(r.Context(),
+		`SELECT id, name, is_active FROM api_keys WHERE user_id = $1 ORDER BY id`, userID,
+	)
+	if err != nil {
+		httpError(w, "database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	result := []map[string]interface{}{}
+	for rows.Next() {
+		var id int64
+		var name string
+		var isActive bool
+		if err := rows.Scan(&id, &name, &isActive); err != nil {
+			continue
+		}
 		result = append(result, map[string]interface{}{
-			"id": k.ID, "name": k.Name, "is_active": k.IsActive,
+			"id": id, "name": name, "is_active": isActive,
 		})
 	}
 	jsonResponse(w, http.StatusOK, map[string]interface{}{"keys": result})
 }
 
-// handleResolveKey returns the decrypted WB API token for a given key ID.
-// Only returns keys belonging to the authenticated user.
 func handleResolveKey(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
@@ -231,32 +256,46 @@ func handleResolveKey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	keys := apiKeys[userID]
-	for _, k := range keys {
-		if k.ID == req.KeyID && k.IsActive {
-			decrypted, err := decrypt(k.TokenEncrypted, cfg.JWTSecret)
-			if err != nil {
-				httpError(w, "decryption error", http.StatusInternalServerError)
-				return
-			}
-			jsonResponse(w, http.StatusOK, map[string]string{"wb_token": decrypted})
-			return
+	var tokenEncrypted string
+	err := db.QueryRow(r.Context(),
+		`SELECT token_encrypted FROM api_keys WHERE id = $1 AND user_id = $2 AND is_active = TRUE`,
+		req.KeyID, userID,
+	).Scan(&tokenEncrypted)
+	if err != nil {
+		if err == pgx.ErrNoRows {
+			httpError(w, "key not found", http.StatusNotFound)
+		} else {
+			httpError(w, "database error", http.StatusInternalServerError)
 		}
+		return
 	}
-	httpError(w, "key not found", http.StatusNotFound)
+
+	decrypted, err := decrypt(tokenEncrypted, cfg.JWTSecret)
+	if err != nil {
+		httpError(w, "decryption error", http.StatusInternalServerError)
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"wb_token": decrypted})
 }
 
 func handleDeleteKey(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
-	keys := apiKeys[userID]
-	for i, k := range keys {
-		if k.IsActive {
-			keys[i].IsActive = false
-			jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
-			return
-		}
+	idStr := r.PathValue("id")
+	keyID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		httpError(w, "invalid key id", http.StatusBadRequest)
+		return
 	}
-	httpError(w, "key not found", http.StatusNotFound)
+
+	tag, err := db.Exec(r.Context(),
+		`UPDATE api_keys SET is_active = FALSE WHERE id = $1 AND user_id = $2`,
+		keyID, userID,
+	)
+	if err != nil || tag.RowsAffected() == 0 {
+		httpError(w, "key not found", http.StatusNotFound)
+		return
+	}
+	jsonResponse(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
 // --- Helpers ---

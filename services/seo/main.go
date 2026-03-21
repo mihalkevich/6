@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -10,39 +12,35 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/wb-analytics/wb-seller-tools/pkg/config"
+	"github.com/wb-analytics/wb-seller-tools/pkg/database"
 	"github.com/wb-analytics/wb-seller-tools/pkg/fashion"
 	"github.com/wb-analytics/wb-seller-tools/pkg/middleware"
 	"github.com/wb-analytics/wb-seller-tools/pkg/wbapi"
 )
 
+//go:embed migrations.sql
+var migrationSQL string
+
 const (
-	maxSearchPages     = 10                // search depth (was 5)
-	maxConcurrent      = 5                 // parallel keyword searches
-	searchCacheTTL     = 15 * time.Minute  // cache WB search results
-	historyMaxAge      = 90 * 24 * time.Hour // keep 90 days of history
-	rateLimitDelay     = 200 * time.Millisecond // min delay between WB requests
-	rateLimitJitter    = 300 * time.Millisecond // random jitter on top
+	maxSearchPages  = 10
+	maxConcurrent   = 5
+	searchCacheTTL  = 15 * time.Minute
+	historyMaxAge   = 90 * 24 * time.Hour
+	rateLimitDelay  = 200 * time.Millisecond
+	rateLimitJitter = 300 * time.Millisecond
 )
 
 var (
 	cfg *config.Config
-
-	mu              sync.RWMutex
-	positionHistory = map[int64]map[string][]positionRecord{} // nmID -> keyword -> history
-
-	// In-memory search cache: "keyword:page" -> cached result
-	cacheMu     sync.RWMutex
-	searchCache = map[string]cachedSearch{}
+	db  *pgxpool.Pool
+	rdb *redis.Client
 
 	// Rate limiter for WB Search API
 	searchLimiter = make(chan struct{}, maxConcurrent)
 )
-
-type cachedSearch struct {
-	result    *wbapi.WBSearchResult
-	fetchedAt time.Time
-}
 
 type positionRecord struct {
 	Position  int       `json:"position"`
@@ -52,6 +50,26 @@ type positionRecord struct {
 
 func main() {
 	cfg = config.Load()
+	ctx := context.Background()
+
+	var err error
+	db, err = database.ConnectPostgres(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
+	if err := database.RunMigrations(ctx, db, migrationSQL); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
+	rdb, err = database.ConnectRedis(ctx, cfg.RedisURL)
+	if err != nil {
+		log.Printf("Redis unavailable, using in-memory search cache: %v", err)
+	}
+
+	// Cleanup old position records on startup
+	go cleanupOldPositions()
 
 	mux := http.NewServeMux()
 	authMw := middleware.AuthMiddleware(cfg.JWTSecret)
@@ -83,6 +101,18 @@ func main() {
 	log.Fatal(http.ListenAndServe(":"+cfg.HTTPPort, mux))
 }
 
+// cleanupOldPositions removes position records older than 90 days.
+func cleanupOldPositions() {
+	cutoff := time.Now().Add(-historyMaxAge)
+	_, err := db.Exec(context.Background(),
+		`DELETE FROM keyword_positions WHERE checked_at < $1`, cutoff)
+	if err != nil {
+		log.Printf("Position cleanup error: %v", err)
+	} else {
+		log.Println("Old position records cleaned up")
+	}
+}
+
 // --- Check Positions ---
 
 type checkRequest struct {
@@ -93,7 +123,7 @@ type checkRequest struct {
 type positionResult struct {
 	NmID     int64  `json:"nm_id"`
 	Keyword  string `json:"keyword"`
-	Position int    `json:"position"` // 0 = not found
+	Position int    `json:"position"`
 	Page     int    `json:"page"`
 	Found    bool   `json:"found"`
 }
@@ -112,7 +142,6 @@ func handleCheckPositions(w http.ResponseWriter, r *http.Request) {
 
 	client := wbapi.NewClient("")
 
-	// Process keywords in parallel with semaphore
 	type kwResult struct {
 		results []positionResult
 	}
@@ -124,8 +153,8 @@ func handleCheckPositions(w http.ResponseWriter, r *http.Request) {
 		wg.Add(1)
 		go func(kw string) {
 			defer wg.Done()
-			searchLimiter <- struct{}{}        // acquire semaphore
-			defer func() { <-searchLimiter }() // release semaphore
+			searchLimiter <- struct{}{}
+			defer func() { <-searchLimiter }()
 
 			var kwResults []positionResult
 			found := map[int64]bool{}
@@ -152,14 +181,12 @@ func handleCheckPositions(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				// Early exit: all products found — no need to check more pages
 				if len(found) == len(req.NmIDs) {
 					allFound = true
 					break
 				}
 			}
 
-			// Mark not found
 			if !allFound {
 				for _, nmID := range req.NmIDs {
 					if !found[nmID] {
@@ -187,19 +214,21 @@ func handleCheckPositions(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, http.StatusOK, results)
 }
 
-// cachedSearchProducts returns cached WB search results or fetches fresh ones.
+// cachedSearchProducts returns cached WB search results (Redis or in-memory fallback).
 func cachedSearchProducts(client *wbapi.Client, keyword string, page int) *wbapi.WBSearchResult {
-	cacheKey := fmt.Sprintf("%s:%d", keyword, page)
+	cacheKey := fmt.Sprintf("wb:search:%s:%d", keyword, page)
 
-	cacheMu.RLock()
-	cached, ok := searchCache[cacheKey]
-	cacheMu.RUnlock()
-
-	if ok && time.Since(cached.fetchedAt) < searchCacheTTL {
-		return cached.result
+	// Try Redis cache
+	if rdb != nil {
+		cached, err := rdb.Get(context.Background(), cacheKey).Bytes()
+		if err == nil {
+			var result wbapi.WBSearchResult
+			if json.Unmarshal(cached, &result) == nil {
+				return &result
+			}
+		}
 	}
 
-	// Rate limit: add delay with jitter to avoid WB anti-bot
 	jitter := time.Duration(rand.Int63n(int64(rateLimitJitter)))
 	time.Sleep(rateLimitDelay + jitter)
 
@@ -209,37 +238,50 @@ func cachedSearchProducts(client *wbapi.Client, keyword string, page int) *wbapi
 		return nil
 	}
 
-	cacheMu.Lock()
-	searchCache[cacheKey] = cachedSearch{result: result, fetchedAt: time.Now()}
-	cacheMu.Unlock()
+	// Cache in Redis
+	if rdb != nil {
+		if data, err := json.Marshal(result); err == nil {
+			rdb.Set(context.Background(), cacheKey, data, searchCacheTTL)
+		}
+	}
 
 	return result
 }
 
-// savePositionHistory saves a position record and rotates old entries.
+// savePositionHistory persists a position record to PostgreSQL.
 func savePositionHistory(nmID int64, keyword string, position, page int) {
-	mu.Lock()
-	defer mu.Unlock()
+	_, err := db.Exec(context.Background(),
+		`INSERT INTO keyword_positions (nm_id, keyword, position, page, checked_at)
+		 VALUES ($1, $2, $3, $4, NOW())`,
+		nmID, keyword, position, page,
+	)
+	if err != nil {
+		log.Printf("Failed to save position: %v", err)
+	}
+}
 
-	if positionHistory[nmID] == nil {
-		positionHistory[nmID] = map[string][]positionRecord{}
+// getPositionHistory loads position history from PostgreSQL.
+func getPositionHistory(nmID int64) map[string][]positionRecord {
+	rows, err := db.Query(context.Background(),
+		`SELECT keyword, position, page, checked_at
+		 FROM keyword_positions WHERE nm_id = $1
+		 ORDER BY keyword, checked_at`, nmID,
+	)
+	if err != nil {
+		return nil
 	}
-	positionHistory[nmID][keyword] = append(positionHistory[nmID][keyword], positionRecord{
-		Position:  position,
-		Page:      page,
-		CheckedAt: time.Now(),
-	})
+	defer rows.Close()
 
-	// Rotate: remove records older than historyMaxAge
-	cutoff := time.Now().Add(-historyMaxAge)
-	records := positionHistory[nmID][keyword]
-	start := 0
-	for start < len(records) && records[start].CheckedAt.Before(cutoff) {
-		start++
+	result := map[string][]positionRecord{}
+	for rows.Next() {
+		var kw string
+		var r positionRecord
+		if err := rows.Scan(&kw, &r.Position, &r.Page, &r.CheckedAt); err != nil {
+			continue
+		}
+		result[kw] = append(result[kw], r)
 	}
-	if start > 0 {
-		positionHistory[nmID][keyword] = records[start:]
-	}
+	return result
 }
 
 // --- Track Keywords ---
@@ -256,16 +298,17 @@ func handleTrackKeywords(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mu.Lock()
-	if positionHistory[req.NmID] == nil {
-		positionHistory[req.NmID] = map[string][]positionRecord{}
-	}
+	// Insert placeholder records with position=0 for tracking
 	for _, kw := range req.Keywords {
-		if _, exists := positionHistory[req.NmID][kw]; !exists {
-			positionHistory[req.NmID][kw] = []positionRecord{}
-		}
+		db.Exec(r.Context(),
+			`INSERT INTO keyword_positions (nm_id, keyword, position, page, checked_at)
+			 SELECT $1, $2, 0, 0, NOW()
+			 WHERE NOT EXISTS (
+			   SELECT 1 FROM keyword_positions WHERE nm_id = $1 AND keyword = $2
+			 )`,
+			req.NmID, kw,
+		)
 	}
-	mu.Unlock()
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"nm_id":            req.NmID,
@@ -279,11 +322,10 @@ func handleTrackKeywords(w http.ResponseWriter, r *http.Request) {
 type historyEntry struct {
 	Keyword string           `json:"keyword"`
 	Records []positionRecord `json:"records"`
-	Trend   string           `json:"trend"` // improving, declining, stable, new
+	Trend   string           `json:"trend"`
 }
 
 func handleHistory(w http.ResponseWriter, r *http.Request) {
-	// Get nm_id from query param
 	nmIDStr := r.URL.Query().Get("nm_id")
 	if nmIDStr == "" {
 		httpError(w, "nm_id query param required", http.StatusBadRequest)
@@ -298,16 +340,22 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 	n, _ := json.Number(nmIDStr).Int64()
 	nmID = n
 
-	mu.RLock()
-	kwMap := positionHistory[nmID]
-	mu.RUnlock()
+	kwMap := getPositionHistory(nmID)
 
 	var entries []historyEntry
 	for kw, records := range kwMap {
+		// Filter out placeholder records (position=0)
+		var real []positionRecord
+		for _, r := range records {
+			if r.Position > 0 {
+				real = append(real, r)
+			}
+		}
+
 		trend := "new"
-		if len(records) >= 2 {
-			last := records[len(records)-1].Position
-			prev := records[len(records)-2].Position
+		if len(real) >= 2 {
+			last := real[len(real)-1].Position
+			prev := real[len(real)-2].Position
 			if last < prev {
 				trend = "improving"
 			} else if last > prev {
@@ -318,7 +366,7 @@ func handleHistory(w http.ResponseWriter, r *http.Request) {
 		}
 		entries = append(entries, historyEntry{
 			Keyword: kw,
-			Records: records,
+			Records: real,
 			Trend:   trend,
 		})
 	}
@@ -363,16 +411,15 @@ func handleSuggestKeywords(w http.ResponseWriter, r *http.Request) {
 
 	groups := dict.GenerateKeywords(req.ProductName, req.Category, req.Brand, hints)
 
-	// Also compute total count.
 	total := 0
 	for _, g := range groups {
 		total += len(g.Keywords)
 	}
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
-		"product_name":    req.ProductName,
+		"product_name":      req.ProductName,
 		"suggestion_groups": groups,
-		"total_keywords":  total,
+		"total_keywords":    total,
 	})
 }
 

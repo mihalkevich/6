@@ -2,11 +2,11 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/wb-analytics/wb-seller-tools/pkg/middleware"
@@ -14,49 +14,41 @@ import (
 
 // --- Notification Channels: Telegram, Email (stub), Webhook ---
 
-var (
-	channelMu sync.RWMutex
-	// userID -> channel settings
-	userChannels = map[int64]*channelSettings{}
-)
-
 type channelSettings struct {
-	UserID       int64            `json:"user_id"`
-	Telegram     *telegramConfig  `json:"telegram,omitempty"`
-	Email        *emailConfig     `json:"email,omitempty"`
-	Webhooks     []webhookConfig  `json:"webhooks,omitempty"`
-	Preferences  alertPreferences `json:"preferences"`
+	UserID      int64            `json:"user_id"`
+	Telegram    *telegramConfig  `json:"telegram,omitempty"`
+	Email       *emailConfig     `json:"email,omitempty"`
+	Webhooks    []webhookConfig  `json:"webhooks,omitempty"`
+	Preferences alertPreferences `json:"preferences"`
 }
 
 type telegramConfig struct {
-	ChatID    string `json:"chat_id"`
-	BotToken  string `json:"bot_token"`
-	Enabled   bool   `json:"enabled"`
+	ChatID   string `json:"chat_id"`
+	BotToken string `json:"bot_token"`
+	Enabled  bool   `json:"enabled"`
 }
 
 type emailConfig struct {
 	Address   string `json:"address"`
-	Frequency string `json:"frequency"` // instant, daily_digest, weekly_digest
+	Frequency string `json:"frequency"`
 	Enabled   bool   `json:"enabled"`
 }
 
 type webhookConfig struct {
 	URL     string            `json:"url"`
 	Headers map[string]string `json:"headers,omitempty"`
-	Events  []string          `json:"events"` // alert types to send
+	Events  []string          `json:"events"`
 	Enabled bool              `json:"enabled"`
 }
 
 type alertPreferences struct {
-	CriticalChannels []string `json:"critical_channels"` // telegram, email, webhook
+	CriticalChannels []string `json:"critical_channels"`
 	WarningChannels  []string `json:"warning_channels"`
 	InfoChannels     []string `json:"info_channels"`
-	QuietHoursStart  int      `json:"quiet_hours_start,omitempty"` // 0-23
+	QuietHoursStart  int      `json:"quiet_hours_start,omitempty"`
 	QuietHoursEnd    int      `json:"quiet_hours_end,omitempty"`
-	Cooldown         int      `json:"cooldown_minutes,omitempty"` // min minutes between same alert type
+	Cooldown         int      `json:"cooldown_minutes,omitempty"`
 }
-
-// --- Configure Channels ---
 
 func handleConfigureChannels(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
@@ -68,9 +60,17 @@ func handleConfigureChannels(w http.ResponseWriter, r *http.Request) {
 	}
 	settings.UserID = userID
 
-	channelMu.Lock()
-	userChannels[userID] = &settings
-	channelMu.Unlock()
+	settingsJSON, _ := json.Marshal(settings)
+	_, err := db.Exec(r.Context(),
+		`INSERT INTO notification_channels (user_id, settings_json, updated_at)
+		 VALUES ($1, $2, NOW())
+		 ON CONFLICT (user_id) DO UPDATE SET settings_json = $2, updated_at = NOW()`,
+		userID, settingsJSON,
+	)
+	if err != nil {
+		httpError(w, "database error", http.StatusInternalServerError)
+		return
+	}
 
 	jsonResponse(w, http.StatusOK, map[string]interface{}{
 		"status":   "configured",
@@ -81,37 +81,46 @@ func handleConfigureChannels(w http.ResponseWriter, r *http.Request) {
 func handleGetChannels(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
-	channelMu.RLock()
-	settings := userChannels[userID]
-	channelMu.RUnlock()
+	settings := loadChannelSettings(r.Context(), userID)
+	jsonResponse(w, http.StatusOK, settings)
+}
 
-	if settings == nil {
-		settings = &channelSettings{
-			UserID: userID,
-			Preferences: alertPreferences{
-				CriticalChannels: []string{"telegram", "webhook"},
-				WarningChannels:  []string{"telegram"},
-				InfoChannels:     []string{},
-				Cooldown:         240, // 4 hours
-			},
+func loadChannelSettings(ctx context.Context, userID int64) *channelSettings {
+	var settingsJSON []byte
+	err := db.QueryRow(ctx,
+		`SELECT settings_json FROM notification_channels WHERE user_id = $1`, userID,
+	).Scan(&settingsJSON)
+
+	if err == nil {
+		var s channelSettings
+		if json.Unmarshal(settingsJSON, &s) == nil {
+			return &s
 		}
 	}
 
-	jsonResponse(w, http.StatusOK, settings)
+	return &channelSettings{
+		UserID: userID,
+		Preferences: alertPreferences{
+			CriticalChannels: []string{"telegram", "webhook"},
+			WarningChannels:  []string{"telegram"},
+			InfoChannels:     []string{},
+			Cooldown:         240,
+		},
+	}
 }
 
 // --- Dispatch Alert to Channels ---
 
 type dispatchRequest struct {
 	AlertIDs []int64 `json:"alert_ids,omitempty"`
-	Latest   int     `json:"latest,omitempty"` // dispatch N latest unread alerts
+	Latest   int     `json:"latest,omitempty"`
 }
 
 type dispatchResult struct {
-	AlertID   int64  `json:"alert_id"`
-	Channel   string `json:"channel"`
-	Status    string `json:"status"` // sent, failed, skipped
-	Error     string `json:"error,omitempty"`
+	AlertID int64  `json:"alert_id"`
+	Channel string `json:"channel"`
+	Status  string `json:"status"`
+	Error   string `json:"error,omitempty"`
 }
 
 func handleDispatch(w http.ResponseWriter, r *http.Request) {
@@ -123,44 +132,50 @@ func handleDispatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	channelMu.RLock()
-	settings := userChannels[userID]
-	channelMu.RUnlock()
-
-	if settings == nil {
+	var settingsJSON []byte
+	err := db.QueryRow(r.Context(),
+		`SELECT settings_json FROM notification_channels WHERE user_id = $1`, userID,
+	).Scan(&settingsJSON)
+	if err != nil {
 		httpError(w, "no channels configured — use POST /api/notifications/channels first", http.StatusBadRequest)
 		return
 	}
 
-	// Get alerts to dispatch.
-	mu.RLock()
-	userAlerts := alerts[userID]
-	mu.RUnlock()
+	var settings channelSettings
+	json.Unmarshal(settingsJSON, &settings)
 
+	// Load alerts to dispatch from DB
 	var toDispatch []alert
 	if len(req.AlertIDs) > 0 {
-		idSet := map[int64]bool{}
-		for _, id := range req.AlertIDs {
-			idSet[id] = true
-		}
-		for _, a := range userAlerts {
-			if idSet[a.ID] {
+		rows, _ := db.Query(r.Context(),
+			`SELECT id, user_id, alert_type, title, message, severity, is_read, created_at
+			 FROM alerts WHERE user_id = $1 AND id = ANY($2)`, userID, req.AlertIDs)
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var a alert
+				rows.Scan(&a.ID, &a.UserID, &a.Type, &a.Title, &a.Message, &a.Severity, &a.IsRead, &a.CreatedAt)
 				toDispatch = append(toDispatch, a)
 			}
 		}
 	} else if req.Latest > 0 {
-		count := 0
-		for i := len(userAlerts) - 1; i >= 0 && count < req.Latest; i-- {
-			if !userAlerts[i].IsRead {
-				toDispatch = append(toDispatch, userAlerts[i])
-				count++
+		rows, _ := db.Query(r.Context(),
+			`SELECT id, user_id, alert_type, title, message, severity, is_read, created_at
+			 FROM alerts WHERE user_id = $1 AND is_read = FALSE
+			 ORDER BY created_at DESC LIMIT $2`, userID, req.Latest)
+		if rows != nil {
+			defer rows.Close()
+			for rows.Next() {
+				var a alert
+				rows.Scan(&a.ID, &a.UserID, &a.Type, &a.Title, &a.Message, &a.Severity, &a.IsRead, &a.CreatedAt)
+				toDispatch = append(toDispatch, a)
 			}
 		}
 	}
 
 	var results []dispatchResult
 	for _, a := range toDispatch {
-		channels := getChannelsForSeverity(settings, a.Severity)
+		channels := getChannelsForSeverity(&settings, a.Severity)
 		if isQuietHours(settings.Preferences) && a.Severity != "critical" {
 			results = append(results, dispatchResult{
 				AlertID: a.ID, Channel: "all", Status: "skipped", Error: "quiet hours",
@@ -169,7 +184,7 @@ func handleDispatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		for _, ch := range channels {
-			result := dispatchToChannel(settings, ch, a)
+			result := dispatchToChannel(&settings, ch, a)
 			results = append(results, result)
 		}
 	}
@@ -201,7 +216,6 @@ func isQuietHours(prefs alertPreferences) bool {
 	if prefs.QuietHoursStart < prefs.QuietHoursEnd {
 		return hour >= prefs.QuietHoursStart && hour < prefs.QuietHoursEnd
 	}
-	// Wraps midnight (e.g., 23-7).
 	return hour >= prefs.QuietHoursStart || hour < prefs.QuietHoursEnd
 }
 
@@ -247,7 +261,6 @@ func dispatchToChannel(settings *channelSettings, channel string, a alert) dispa
 		}
 
 	case "email":
-		// Email is a stub — in production, integrate with SMTP/SendGrid.
 		if settings.Email == nil || !settings.Email.Enabled {
 			result.Status = "skipped"
 			result.Error = "email not configured"
@@ -264,8 +277,6 @@ func dispatchToChannel(settings *channelSettings, channel string, a alert) dispa
 	return result
 }
 
-// --- Telegram ---
-
 func sendTelegram(cfg *telegramConfig, a alert) error {
 	emoji := "ℹ️"
 	switch a.Severity {
@@ -276,7 +287,6 @@ func sendTelegram(cfg *telegramConfig, a alert) error {
 	}
 
 	text := fmt.Sprintf("%s *%s*\n\n%s", emoji, a.Title, a.Message)
-
 	payload := map[string]interface{}{
 		"chat_id":    cfg.ChatID,
 		"text":       text,
@@ -297,8 +307,6 @@ func sendTelegram(cfg *telegramConfig, a alert) error {
 	}
 	return nil
 }
-
-// --- Webhook ---
 
 func sendWebhook(wh webhookConfig, a alert) error {
 	payload := map[string]interface{}{
@@ -333,27 +341,28 @@ func sendWebhook(wh webhookConfig, a alert) error {
 	return nil
 }
 
-// --- Test Channel ---
-
 func handleTestChannel(w http.ResponseWriter, r *http.Request) {
 	userID, _ := middleware.GetUserID(r.Context())
 
 	var req struct {
-		Channel string `json:"channel"` // telegram, webhook, email
+		Channel string `json:"channel"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
 
-	channelMu.RLock()
-	settings := userChannels[userID]
-	channelMu.RUnlock()
-
-	if settings == nil {
+	var settingsJSON []byte
+	err := db.QueryRow(r.Context(),
+		`SELECT settings_json FROM notification_channels WHERE user_id = $1`, userID,
+	).Scan(&settingsJSON)
+	if err != nil {
 		httpError(w, "no channels configured", http.StatusBadRequest)
 		return
 	}
+
+	var settings channelSettings
+	json.Unmarshal(settingsJSON, &settings)
 
 	testAlert := alert{
 		ID:        0,
@@ -365,7 +374,7 @@ func handleTestChannel(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 	}
 
-	result := dispatchToChannel(settings, req.Channel, testAlert)
+	result := dispatchToChannel(&settings, req.Channel, testAlert)
 	jsonResponse(w, http.StatusOK, result)
 }
 

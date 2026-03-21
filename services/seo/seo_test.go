@@ -207,39 +207,17 @@ func TestSnapshotSaveAndRetrieve(t *testing.T) {
 
 // --- Forecast Tests ---
 
-func TestForecast(t *testing.T) {
-	// Seed history data.
-	mu.Lock()
-	positionHistory = map[int64]map[string][]positionRecord{}
-	positionHistory[99999] = map[string][]positionRecord{
-		"платье летнее": {
-			{Position: 50, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -14)},
-			{Position: 40, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -10)},
-			{Position: 30, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -7)},
-			{Position: 25, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -3)},
-			{Position: 20, Page: 1, CheckedAt: time.Now()},
-		},
-	}
-	mu.Unlock()
-
-	body := forecastRequest{NmID: 99999}
-	b, _ := json.Marshal(body)
-	req := httptest.NewRequest(http.MethodPost, "/api/seo/forecast", bytes.NewReader(b))
-	w := httptest.NewRecorder()
-	handleForecast(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("Expected 200, got %d: %s", w.Code, w.Body.String())
+func TestAnalyzeKeywordTrend(t *testing.T) {
+	records := []positionRecord{
+		{Position: 50, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -14)},
+		{Position: 40, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -10)},
+		{Position: 30, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -7)},
+		{Position: 25, Page: 1, CheckedAt: time.Now().AddDate(0, 0, -3)},
+		{Position: 20, Page: 1, CheckedAt: time.Now()},
 	}
 
-	var resp forecastResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	fc := analyzeKeywordTrend("платье летнее", records)
 
-	if len(resp.Forecasts) == 0 {
-		t.Fatal("Expected at least one forecast")
-	}
-
-	fc := resp.Forecasts[0]
 	if fc.Trend != "improving" {
 		t.Errorf("Expected 'improving' trend, got %q (velocity=%.2f)", fc.Trend, fc.Velocity)
 	}
@@ -248,5 +226,14 @@ func TestForecast(t *testing.T) {
 	}
 	if fc.PredictedPos >= fc.CurrentPos {
 		t.Errorf("Predicted position (%d) should be better than current (%d)", fc.PredictedPos, fc.CurrentPos)
+	}
+	if fc.CurrentPos != 20 {
+		t.Errorf("Expected current position 20, got %d", fc.CurrentPos)
+	}
+	if fc.BestPos != 20 {
+		t.Errorf("Expected best position 20, got %d", fc.BestPos)
+	}
+	if fc.DataPoints != 5 {
+		t.Errorf("Expected 5 data points, got %d", fc.DataPoints)
 	}
 }
