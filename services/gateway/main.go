@@ -26,6 +26,7 @@ var serviceRoutes = map[string]string{
 	"/api/seo":           envOrDefault("SEO_SERVICE_URL", "http://localhost:8086"),
 	"/api/notifications": envOrDefault("NOTIFICATION_SERVICE_URL", "http://localhost:8087"),
 	"/api/fashion":       envOrDefault("FASHION_SERVICE_URL", "http://localhost:8088"),
+	"/api/scheduler":     envOrDefault("SCHEDULER_SERVICE_URL", "http://localhost:8089"),
 }
 
 func main() {
@@ -51,7 +52,8 @@ func main() {
 				{"name": "competitor", "prefix": "/api/competitors", "description": "Competitor Analysis & Price Compare"},
 				{"name": "seo", "prefix": "/api/seo", "description": "SEO & Keyword Position Tracking"},
 				{"name": "notifications", "prefix": "/api/notifications", "description": "Alerts & Notifications"},
-				{"name": "fashion-analytics", "prefix": "/api/fashion", "description": "Fashion Analytics: Sizes, Seasons, Trends, Returns"}
+				{"name": "fashion-analytics", "prefix": "/api/fashion", "description": "Fashion Analytics: Sizes, Seasons, Trends, Returns"},
+				{"name": "scheduler", "prefix": "/api/scheduler", "description": "CRON Scheduler for Keyword Position Tracking"}
 			]
 		}`)
 	})

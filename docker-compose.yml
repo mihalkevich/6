@@ -45,6 +45,7 @@ services:
       - SEO_SERVICE_URL=http://seo:8080
       - NOTIFICATION_SERVICE_URL=http://notifications:8080
       - FASHION_SERVICE_URL=http://fashion-analytics:8080
+      - SCHEDULER_SERVICE_URL=http://scheduler:8080
     depends_on:
       - auth
       - collector
@@ -54,6 +55,7 @@ services:
       - seo
       - notifications
       - fashion-analytics
+      - scheduler
 
   auth:
     build:
@@ -157,6 +159,20 @@ services:
       - HTTP_PORT=8080
       - JWT_SECRET=${JWT_SECRET:-super-secret-change-me}
       - COLLECTOR_SERVICE_URL=http://collector:8080
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SERVICE: scheduler
+    environment:
+      - HTTP_PORT=8080
+      - DATABASE_URL=postgres://postgres:postgres@postgres:5432/wb_analytics?sslmode=disable
+      - SCHEDULER_INTERVAL=30m
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   web:
     build:

@@ -16,6 +16,7 @@ build:
 	go build -o bin/seo ./services/seo/
 	go build -o bin/notifications ./services/notifications/
 	go build -o bin/fashion-analytics ./services/fashion-analytics/
+	go build -o bin/scheduler ./services/scheduler/
 	@echo "All services built successfully!"
 
 test:
@@ -78,6 +79,9 @@ run-notifications:
 
 run-fashion:
 	HTTP_PORT=8088 go run ./services/fashion-analytics/
+
+run-scheduler:
+	HTTP_PORT=8089 go run ./services/scheduler/
 
 # --- Docker ---
 

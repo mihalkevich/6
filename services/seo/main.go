@@ -88,6 +88,12 @@ func main() {
 	mux.Handle("POST /api/seo/forecast", authMw(http.HandlerFunc(handleForecast)))
 	mux.Handle("POST /api/seo/history/enhanced", authMw(http.HandlerFunc(handleEnhancedHistory)))
 
+	// Tracked keywords management (for scheduler)
+	mux.Handle("GET /api/seo/tracked", authMw(http.HandlerFunc(handleListTracked)))
+	mux.Handle("POST /api/seo/tracked", authMw(http.HandlerFunc(handleAddTracked)))
+	mux.Handle("DELETE /api/seo/tracked", authMw(http.HandlerFunc(handleRemoveTracked)))
+	mux.Handle("GET /api/seo/tracked/due", http.HandlerFunc(handleDueKeywords)) // internal, no auth
+
 	// Phase 5: Card Optimization
 	mux.Handle("POST /api/seo/card-audit", authMw(http.HandlerFunc(handleCardAudit)))
 	mux.Handle("POST /api/seo/generate-title", authMw(http.HandlerFunc(handleGenerateTitle)))
@@ -292,21 +298,20 @@ type trackRequest struct {
 }
 
 func handleTrackKeywords(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+
 	var req trackRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		httpError(w, "invalid body", http.StatusBadRequest)
 		return
 	}
 
-	// Insert placeholder records with position=0 for tracking
 	for _, kw := range req.Keywords {
 		db.Exec(r.Context(),
-			`INSERT INTO keyword_positions (nm_id, keyword, position, page, checked_at)
-			 SELECT $1, $2, 0, 0, NOW()
-			 WHERE NOT EXISTS (
-			   SELECT 1 FROM keyword_positions WHERE nm_id = $1 AND keyword = $2
-			 )`,
-			req.NmID, kw,
+			`INSERT INTO tracked_keywords (user_id, nm_id, keyword)
+			 VALUES ($1, $2, $3)
+			 ON CONFLICT (user_id, nm_id, keyword) DO UPDATE SET is_active = TRUE`,
+			userID, req.NmID, kw,
 		)
 	}
 
@@ -420,6 +425,171 @@ func handleSuggestKeywords(w http.ResponseWriter, r *http.Request) {
 		"product_name":      req.ProductName,
 		"suggestion_groups": groups,
 		"total_keywords":    total,
+	})
+}
+
+// --- Tracked Keywords Management ---
+
+type trackedKeyword struct {
+	ID            int64      `json:"id"`
+	UserID        int64      `json:"user_id"`
+	NmID          int64      `json:"nm_id"`
+	Keyword       string     `json:"keyword"`
+	IsActive      bool       `json:"is_active"`
+	CheckInterval int        `json:"check_interval_min"`
+	AlertThreshold int       `json:"alert_threshold"`
+	LastCheckedAt *time.Time `json:"last_checked_at"`
+	LastPosition  int        `json:"last_position"`
+}
+
+func handleListTracked(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+
+	rows, err := db.Query(r.Context(),
+		`SELECT id, user_id, nm_id, keyword, is_active, check_interval_min,
+		 alert_threshold, last_checked_at, last_position
+		 FROM tracked_keywords WHERE user_id = $1 ORDER BY nm_id, keyword`, userID,
+	)
+	if err != nil {
+		jsonResponse(w, http.StatusOK, map[string]interface{}{"keywords": []trackedKeyword{}, "total": 0})
+		return
+	}
+	defer rows.Close()
+
+	var keywords []trackedKeyword
+	for rows.Next() {
+		var tk trackedKeyword
+		rows.Scan(&tk.ID, &tk.UserID, &tk.NmID, &tk.Keyword, &tk.IsActive,
+			&tk.CheckInterval, &tk.AlertThreshold, &tk.LastCheckedAt, &tk.LastPosition)
+		keywords = append(keywords, tk)
+	}
+	if keywords == nil {
+		keywords = []trackedKeyword{}
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"keywords": keywords,
+		"total":    len(keywords),
+	})
+}
+
+type addTrackedRequest struct {
+	NmID           int64    `json:"nm_id"`
+	Keywords       []string `json:"keywords"`
+	CheckInterval  int      `json:"check_interval_min,omitempty"`
+	AlertThreshold int      `json:"alert_threshold,omitempty"`
+}
+
+func handleAddTracked(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+
+	var req addTrackedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if req.NmID == 0 || len(req.Keywords) == 0 {
+		httpError(w, "nm_id and keywords required", http.StatusBadRequest)
+		return
+	}
+
+	interval := 240
+	if req.CheckInterval > 0 {
+		interval = req.CheckInterval
+	}
+	threshold := 5
+	if req.AlertThreshold > 0 {
+		threshold = req.AlertThreshold
+	}
+
+	added := 0
+	for _, kw := range req.Keywords {
+		_, err := db.Exec(r.Context(),
+			`INSERT INTO tracked_keywords (user_id, nm_id, keyword, check_interval_min, alert_threshold)
+			 VALUES ($1, $2, $3, $4, $5)
+			 ON CONFLICT (user_id, nm_id, keyword) DO UPDATE SET
+			   is_active = TRUE, check_interval_min = $4, alert_threshold = $5`,
+			userID, req.NmID, kw, interval, threshold,
+		)
+		if err == nil {
+			added++
+		}
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"added":  added,
+		"nm_id":  req.NmID,
+		"status": "tracking",
+	})
+}
+
+type removeTrackedRequest struct {
+	NmID     int64    `json:"nm_id"`
+	Keywords []string `json:"keywords,omitempty"`
+}
+
+func handleRemoveTracked(w http.ResponseWriter, r *http.Request) {
+	userID, _ := middleware.GetUserID(r.Context())
+
+	var req removeTrackedRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpError(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if len(req.Keywords) > 0 {
+		for _, kw := range req.Keywords {
+			db.Exec(r.Context(),
+				`UPDATE tracked_keywords SET is_active = FALSE
+				 WHERE user_id = $1 AND nm_id = $2 AND keyword = $3`,
+				userID, req.NmID, kw,
+			)
+		}
+	} else {
+		db.Exec(r.Context(),
+			`UPDATE tracked_keywords SET is_active = FALSE
+			 WHERE user_id = $1 AND nm_id = $2`,
+			userID, req.NmID,
+		)
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]string{"status": "removed"})
+}
+
+// handleDueKeywords is an internal endpoint for the scheduler.
+// Returns keywords that are due for position checking.
+func handleDueKeywords(w http.ResponseWriter, r *http.Request) {
+	limit := 100
+
+	rows, err := db.Query(r.Context(),
+		`SELECT id, user_id, nm_id, keyword, check_interval_min, alert_threshold, last_position
+		 FROM tracked_keywords
+		 WHERE is_active = TRUE
+		   AND (last_checked_at IS NULL
+		        OR last_checked_at + (check_interval_min || ' minutes')::interval <= NOW())
+		 ORDER BY last_checked_at ASC NULLS FIRST
+		 LIMIT $1`, limit,
+	)
+	if err != nil {
+		jsonResponse(w, http.StatusOK, map[string]interface{}{"keywords": []trackedKeyword{}, "total": 0})
+		return
+	}
+	defer rows.Close()
+
+	var keywords []trackedKeyword
+	for rows.Next() {
+		var tk trackedKeyword
+		rows.Scan(&tk.ID, &tk.UserID, &tk.NmID, &tk.Keyword,
+			&tk.CheckInterval, &tk.AlertThreshold, &tk.LastPosition)
+		keywords = append(keywords, tk)
+	}
+	if keywords == nil {
+		keywords = []trackedKeyword{}
+	}
+
+	jsonResponse(w, http.StatusOK, map[string]interface{}{
+		"keywords": keywords,
+		"total":    len(keywords),
 	})
 }
 
