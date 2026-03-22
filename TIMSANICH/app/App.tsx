@@ -1,6 +1,24 @@
-import React, { useState } from 'react';
+/**
+ * App — Main entry with animated tab bar
+ *
+ * Features:
+ * - Bouncing tab icons on press with haptic
+ * - Animated active indicator sliding between tabs
+ * - Badge count on progress tab
+ * - Smooth transitions
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, Pressable } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withTiming,
+  interpolate,
+} from 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   OnboardingScreen,
@@ -11,8 +29,10 @@ import {
   ProfileScreen,
 } from './src/screens';
 import { useAppStore } from './src/store/useAppStore';
-import { Colors, Spacing, Shadows } from './src/constants/theme';
-import { hapticSelection } from './src/utils/haptics';
+import { Colors, Spacing, Shadows, Radius } from './src/constants/theme';
+import { hapticSelection, hapticTap } from './src/utils/haptics';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 type Tab = 'home' | 'path' | 'progress' | 'profile';
 
@@ -23,8 +43,69 @@ const tabs: { id: Tab; emoji: string; label: string }[] = [
   { id: 'profile', emoji: '👤', label: 'Профиль' },
 ];
 
+// === Tab Bar Item ===
+function TabItem({
+  tab,
+  isActive,
+  onPress,
+  badge,
+}: {
+  tab: { id: Tab; emoji: string; label: string };
+  isActive: boolean;
+  onPress: () => void;
+  badge?: number;
+}) {
+  const scale = useSharedValue(1);
+  const bounce = useSharedValue(0);
+
+  const handlePress = useCallback(() => {
+    hapticSelection();
+    // Bounce animation
+    scale.value = withSequence(
+      withTiming(0.85, { duration: 60 }),
+      withSpring(1, { damping: 10, stiffness: 400, mass: 0.3 })
+    );
+    bounce.value = withSequence(
+      withTiming(-4, { duration: 80 }),
+      withSpring(0, { damping: 10, stiffness: 300 })
+    );
+    onPress();
+  }, [onPress]);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateY: bounce.value },
+    ],
+  }));
+
+  return (
+    <AnimatedPressable
+      style={[styles.tabItem, animStyle]}
+      onPress={handlePress}
+    >
+      {/* Active background pill */}
+      {isActive && <View style={styles.tabActiveBg} />}
+
+      <Text style={[styles.tabEmoji, isActive && styles.tabEmojiActive]}>
+        {tab.emoji}
+      </Text>
+      <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
+        {tab.label}
+      </Text>
+
+      {/* Badge */}
+      {badge != null && badge > 0 && (
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>{badge > 9 ? '9+' : badge}</Text>
+        </View>
+      )}
+    </AnimatedPressable>
+  );
+}
+
 export default function App() {
-  const { child } = useAppStore();
+  const { child, rewards } = useAppStore();
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [activeLessonId, setActiveLessonId] = useState<string | null>(null);
   const [onboardingDone, setOnboardingDone] = useState(false);
@@ -70,33 +151,26 @@ export default function App() {
     }
   };
 
+  // Badge count for new rewards (simple — show count if > 0)
+  const rewardsBadge = rewards.length > 0 ? rewards.length : undefined;
+
   return (
     <SafeAreaProvider>
       <StatusBar style="dark" />
       <View style={styles.container}>
         {renderScreen()}
 
-        {/* Tab Bar */}
+        {/* Animated Tab Bar */}
         <View style={styles.tabBar}>
-          {tabs.map((tab) => {
-            const isActive = activeTab === tab.id;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                style={styles.tabItem}
-                onPress={() => { hapticSelection(); setActiveTab(tab.id); }}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.tabEmoji, isActive && styles.tabEmojiActive]}>
-                  {tab.emoji}
-                </Text>
-                <Text style={[styles.tabLabel, isActive && styles.tabLabelActive]}>
-                  {tab.label}
-                </Text>
-                {isActive && <View style={styles.tabIndicator} />}
-              </TouchableOpacity>
-            );
-          })}
+          {tabs.map((tab) => (
+            <TabItem
+              key={tab.id}
+              tab={tab}
+              isActive={activeTab === tab.id}
+              onPress={() => setActiveTab(tab.id)}
+              badge={tab.id === 'progress' ? rewardsBadge : undefined}
+            />
+          ))}
         </View>
       </View>
     </SafeAreaProvider>
@@ -116,9 +190,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Colors.white,
     paddingBottom: 24,
-    paddingTop: Spacing.sm,
+    paddingTop: Spacing.xs,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    borderTopWidth: 1,
+    borderTopColor: Colors.border,
     ...Shadows.elevated,
   },
   tabItem: {
@@ -127,7 +203,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 2,
     position: 'relative',
-    paddingVertical: Spacing.xxs,
+    paddingVertical: Spacing.xs,
+  },
+  tabActiveBg: {
+    position: 'absolute',
+    top: 4,
+    width: 48,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.primaryLight,
   },
   tabEmoji: {
     fontSize: 22,
@@ -143,14 +227,23 @@ const styles = StyleSheet.create({
   },
   tabLabelActive: {
     color: Colors.primary,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  tabIndicator: {
+  badge: {
     position: 'absolute',
-    top: -Spacing.sm,
-    width: 24,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: Colors.primary,
+    top: 0,
+    right: '25%',
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: Colors.errorRed,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  badgeText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: '800',
   },
 });

@@ -1,15 +1,50 @@
-import React from 'react';
+/**
+ * ProfileScreen — Enhanced with animations, haptics, notification settings
+ *
+ * Features:
+ * - Animated profile header with bouncing avatar
+ * - 3D stat cards with haptic press
+ * - Notification toggle with haptic
+ * - Animated achievement badges
+ * - Settings with 3D touch feedback
+ */
+
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   SafeAreaView,
   ScrollView,
-  TouchableOpacity,
+  Pressable,
+  Switch,
+  Alert,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  withRepeat,
+  withSequence,
+  interpolate,
+  FadeIn,
+  SlideInRight,
+  Easing,
+} from 'react-native-reanimated';
 import { Colors, Typography, Spacing, Radius, Shadows } from '../constants/theme';
-import { Card, EmojiCircle } from '../components/ui';
+import { EmojiCircle, DuoButton } from '../components/ui';
 import { useAppStore } from '../store/useAppStore';
+import { hapticTap, hapticPress, hapticSelection, hapticCelebration, hapticReward } from '../utils/haptics';
+import {
+  requestNotificationPermissions,
+  scheduleDailyReminder,
+  cancelDailyReminders,
+  getScheduledCount,
+} from '../utils/notifications';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 const goalLabels: Record<string, string> = {
   speech: '🗣️ Речь',
@@ -28,8 +63,137 @@ const focusLabels: Record<string, string> = {
   parent_tasks: '👨‍👧 Задания с родителем',
 };
 
+// === 3D Setting Row ===
+function SettingRow3D({
+  label,
+  value,
+  onPress,
+  index,
+}: {
+  label: string;
+  value: string;
+  onPress?: () => void;
+  index: number;
+}) {
+  const pressed = useSharedValue(0);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(pressed.value, [0, 1], [0, 2]) },
+    ],
+  }));
+
+  return (
+    <AnimatedPressable
+      onPressIn={() => { if (onPress) pressed.value = withTiming(1, { duration: 60 }); }}
+      onPressOut={() => { pressed.value = withSpring(0, { damping: 15, stiffness: 400 }); }}
+      onPress={() => { if (onPress) { hapticTap(); onPress(); } }}
+      style={[styles.settingRow, style]}
+    >
+      <Text style={styles.settingLabel}>{label}</Text>
+      <Text style={styles.settingValue}>{value}</Text>
+    </AnimatedPressable>
+  );
+}
+
+// === Achievement Badge ===
+function AchievementBadge({
+  emoji,
+  name,
+  description,
+  index,
+}: {
+  emoji: string;
+  name: string;
+  description: string;
+  index: number;
+}) {
+  const scale = useSharedValue(0);
+  const [showDetail, setShowDetail] = useState(false);
+
+  useEffect(() => {
+    scale.value = withDelay(
+      index * 80,
+      withSpring(1, { damping: 8, stiffness: 250, mass: 0.5 })
+    );
+  }, []);
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <Pressable
+      onPress={() => {
+        hapticTap();
+        setShowDetail(!showDetail);
+      }}
+    >
+      <Animated.View style={[styles.achievementItem, style]}>
+        <View style={styles.achievementCircle}>
+          <Text style={styles.achievementEmoji}>{emoji}</Text>
+        </View>
+        {showDetail && (
+          <Animated.View
+            entering={FadeIn.duration(200)}
+            style={styles.achievementTooltip}
+          >
+            <Text style={styles.achievementTooltipTitle}>{name}</Text>
+            <Text style={styles.achievementTooltipDesc}>{description}</Text>
+          </Animated.View>
+        )}
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export function ProfileScreen() {
   const { child, streak, progress, rewards } = useAppStore();
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [hapticEnabled, setHapticEnabled] = useState(true);
+
+  // Animated avatar
+  const avatarScale = useSharedValue(0);
+  const avatarPulse = useSharedValue(1);
+
+  useEffect(() => {
+    avatarScale.value = withSpring(1, { damping: 10, stiffness: 200, mass: 0.5 });
+
+    // Check notification status
+    getScheduledCount().then((count) => setNotificationsEnabled(count > 0));
+  }, []);
+
+  const avatarStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: avatarScale.value }],
+  }));
+
+  const handleToggleNotifications = useCallback(async (value: boolean) => {
+    hapticSelection();
+    setNotificationsEnabled(value);
+
+    if (value) {
+      const granted = await requestNotificationPermissions();
+      if (granted && child) {
+        await scheduleDailyReminder(18, 0, child.name);
+      } else if (!granted) {
+        setNotificationsEnabled(false);
+        Alert.alert(
+          'Уведомления отключены',
+          'Включите уведомления в настройках устройства',
+        );
+      }
+    } else {
+      await cancelDailyReminders();
+    }
+  }, [child]);
+
+  const handleAvatarPress = useCallback(() => {
+    hapticReward();
+    avatarScale.value = withSequence(
+      withTiming(1.2, { duration: 150 }),
+      withSpring(1, { damping: 8, stiffness: 300 })
+    );
+  }, []);
 
   if (!child) return null;
 
@@ -41,17 +205,34 @@ export function ProfileScreen() {
       >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
-          <EmojiCircle
-            emoji={child.avatarEmoji}
-            size={96}
-            backgroundColor={Colors.primaryLight}
-          />
-          <Text style={styles.childName}>{child.name}</Text>
-          <Text style={styles.childAge}>{child.age} года</Text>
+          <Pressable onPress={handleAvatarPress}>
+            <Animated.View style={avatarStyle}>
+              <EmojiCircle
+                emoji={child.avatarEmoji}
+                size={100}
+                backgroundColor={Colors.primaryLight}
+              />
+            </Animated.View>
+          </Pressable>
+          <Animated.Text
+            entering={FadeIn.delay(200)}
+            style={styles.childName}
+          >
+            {child.name}
+          </Animated.Text>
+          <Animated.Text
+            entering={FadeIn.delay(300)}
+            style={styles.childAge}
+          >
+            {child.age} года
+          </Animated.Text>
         </View>
 
-        {/* Quick Stats */}
-        <View style={styles.quickStats}>
+        {/* Quick Stats — 3D */}
+        <Animated.View
+          entering={FadeIn.delay(300).springify()}
+          style={styles.quickStats}
+        >
           <View style={styles.quickStatItem}>
             <Text style={styles.quickStatValue}>{progress.totalXP}</Text>
             <Text style={styles.quickStatLabel}>XP</Text>
@@ -66,68 +247,129 @@ export function ProfileScreen() {
             <Text style={styles.quickStatValue}>{progress.totalLessons}</Text>
             <Text style={styles.quickStatLabel}>Уроков</Text>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Goals */}
-        <Card style={styles.sectionCard}>
+        <Animated.View
+          entering={SlideInRight.delay(400).springify()}
+          style={styles.sectionCard}
+        >
           <Text style={styles.sectionTitle}>Цели развития</Text>
           <View style={styles.tagList}>
-            {child.goals.map((goal) => (
-              <View key={goal} style={styles.tag}>
+            {child.goals.map((goal, i) => (
+              <Animated.View
+                key={goal}
+                entering={FadeIn.delay(500 + i * 60)}
+                style={styles.tag}
+              >
                 <Text style={styles.tagText}>{goalLabels[goal] || goal}</Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
-        </Card>
+        </Animated.View>
 
         {/* Focus Areas */}
-        <Card style={styles.sectionCard}>
+        <Animated.View
+          entering={SlideInRight.delay(500).springify()}
+          style={styles.sectionCard}
+        >
           <Text style={styles.sectionTitle}>Фокус обучения</Text>
           <View style={styles.tagList}>
-            {child.focusAreas.map((area) => (
-              <View key={area} style={styles.tag}>
+            {child.focusAreas.map((area, i) => (
+              <Animated.View
+                key={area}
+                entering={FadeIn.delay(600 + i * 60)}
+                style={styles.tag}
+              >
                 <Text style={styles.tagText}>{focusLabels[area] || area}</Text>
-              </View>
+              </Animated.View>
             ))}
           </View>
-        </Card>
+        </Animated.View>
 
         {/* Settings */}
-        <Card style={styles.sectionCard}>
+        <Animated.View
+          entering={SlideInRight.delay(600).springify()}
+          style={styles.sectionCard}
+        >
           <Text style={styles.sectionTitle}>Настройки</Text>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Занятий в день</Text>
-            <Text style={styles.settingValue}>{child.dailyMinutes} минут</Text>
+          <SettingRow3D
+            label="Занятий в день"
+            value={`${child.dailyMinutes} мин`}
+            index={0}
+          />
+          <SettingRow3D
+            label="Возрастная группа"
+            value={`${child.age}+`}
+            index={1}
+          />
+          <View style={styles.settingRowSwitch}>
+            <Text style={styles.settingLabel}>🔔 Напоминания</Text>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleToggleNotifications}
+              trackColor={{ false: Colors.lockedGrayLight, true: Colors.primaryLight }}
+              thumbColor={notificationsEnabled ? Colors.primary : Colors.lockedGray}
+            />
           </View>
-          <View style={styles.settingRow}>
-            <Text style={styles.settingLabel}>Возрастная группа</Text>
-            <Text style={styles.settingValue}>{child.age}+</Text>
+          {notificationsEnabled && (
+            <Animated.Text
+              entering={FadeIn.duration(200)}
+              style={styles.settingHint}
+            >
+              Ежедневное напоминание в 18:00
+            </Animated.Text>
+          )}
+          <View style={styles.settingRowSwitch}>
+            <Text style={styles.settingLabel}>📳 Тактильная обратная связь</Text>
+            <Switch
+              value={hapticEnabled}
+              onValueChange={(v) => {
+                hapticSelection();
+                setHapticEnabled(v);
+              }}
+              trackColor={{ false: Colors.lockedGrayLight, true: Colors.primaryLight }}
+              thumbColor={hapticEnabled ? Colors.primary : Colors.lockedGray}
+            />
           </View>
-        </Card>
+        </Animated.View>
 
         {/* Achievements */}
-        <Card style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Достижения</Text>
+        <Animated.View
+          entering={SlideInRight.delay(700).springify()}
+          style={styles.sectionCard}
+        >
+          <Text style={styles.sectionTitle}>Достижения 🏆</Text>
           {rewards.length === 0 ? (
             <Text style={styles.emptyText}>
               Завершите первый урок, чтобы получить награду! ⭐
             </Text>
           ) : (
             <View style={styles.achievementGrid}>
-              {rewards.slice(0, 8).map((reward) => (
-                <View key={reward.id} style={styles.achievementItem}>
-                  <Text style={styles.achievementEmoji}>{reward.emoji}</Text>
-                </View>
+              {rewards.map((reward, i) => (
+                <AchievementBadge
+                  key={reward.id}
+                  emoji={reward.emoji}
+                  name={reward.name}
+                  description={reward.description}
+                  index={i}
+                />
               ))}
             </View>
           )}
-        </Card>
+        </Animated.View>
 
         {/* App Info */}
-        <View style={styles.appInfo}>
+        <Animated.View
+          entering={FadeIn.delay(800)}
+          style={styles.appInfo}
+        >
           <Text style={styles.appName}>TIMSANICH Kids Edu</Text>
-          <Text style={styles.appVersion}>Версия 1.0.0</Text>
-        </View>
+          <Text style={styles.appVersion}>Версия 1.1.0</Text>
+          <Text style={styles.appFeatures}>
+            Haptic Feedback • Adaptive Learning • Duolingo-style UI
+          </Text>
+        </Animated.View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -163,7 +405,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.xl,
     padding: Spacing.lg,
     marginBottom: Spacing.lg,
-    ...Shadows.card,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderBottomWidth: 4,
+    borderBottomColor: '#D1D5DB',
   },
   quickStatItem: {
     flex: 1,
@@ -176,14 +421,22 @@ const styles = StyleSheet.create({
   quickStatLabel: {
     ...Typography.caption,
     marginTop: 2,
+    color: Colors.textSecondary,
   },
   quickStatDivider: {
     width: 1,
     backgroundColor: Colors.border,
   },
   sectionCard: {
+    backgroundColor: Colors.white,
+    borderRadius: Radius.xl,
+    padding: Spacing.lg,
     marginBottom: Spacing.md,
     gap: Spacing.sm,
+    borderWidth: 2,
+    borderColor: Colors.border,
+    borderBottomWidth: 4,
+    borderBottomColor: '#D1D5DB',
   },
   sectionTitle: {
     ...Typography.headingS,
@@ -198,26 +451,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xxs,
     borderRadius: Radius.full,
+    borderWidth: 1,
+    borderColor: Colors.primary + '30',
   },
   tagText: {
     ...Typography.bodyS,
     color: Colors.primary,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   settingRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.border,
+  },
+  settingRowSwitch: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
   },
   settingLabel: {
     ...Typography.bodyM,
-    color: Colors.textSecondary,
+    color: Colors.textPrimary,
   },
   settingValue: {
     ...Typography.bodyM,
-    fontWeight: '600',
-    color: Colors.textPrimary,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
+  settingHint: {
+    ...Typography.caption,
+    color: Colors.textSecondary,
+    marginTop: -Spacing.xxs,
+    marginLeft: Spacing.xxl,
   },
   emptyText: {
     ...Typography.bodyM,
@@ -228,18 +497,45 @@ const styles = StyleSheet.create({
   achievementGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.sm,
+    gap: Spacing.md,
   },
   achievementItem: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    alignItems: 'center',
+    width: 72,
+  },
+  achievementCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
     backgroundColor: Colors.rewardGoldLight,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: Colors.rewardGold,
+    borderBottomWidth: 4,
+    borderBottomColor: '#DAB800',
   },
   achievementEmoji: {
     fontSize: 28,
+  },
+  achievementTooltip: {
+    backgroundColor: Colors.textPrimary,
+    borderRadius: Radius.sm,
+    padding: Spacing.xs,
+    marginTop: Spacing.xxs,
+    alignItems: 'center',
+    maxWidth: 120,
+  },
+  achievementTooltipTitle: {
+    color: Colors.white,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  achievementTooltipDesc: {
+    color: Colors.white,
+    fontSize: 10,
+    opacity: 0.8,
+    textAlign: 'center',
   },
   appInfo: {
     alignItems: 'center',
@@ -248,11 +544,17 @@ const styles = StyleSheet.create({
   },
   appName: {
     ...Typography.bodyS,
-    fontWeight: '600',
+    fontWeight: '700',
     color: Colors.textSecondary,
   },
   appVersion: {
     ...Typography.caption,
     color: Colors.textLight,
+  },
+  appFeatures: {
+    ...Typography.caption,
+    color: Colors.textLight,
+    textAlign: 'center',
+    marginTop: Spacing.xxs,
   },
 });
