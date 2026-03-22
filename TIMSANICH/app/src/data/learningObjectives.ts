@@ -228,6 +228,131 @@ export const lessonMeta: Record<string, LessonMeta> = {
     parentFollowUpRu: 'Усложните: «Найди что-то красное И круглое!»',
     newWords: [],
   },
+  // === NUMBERS ===
+  'numbers-1': {
+    primarySkill: 'counting',
+    secondarySkills: ['attention', 'vocabulary'],
+    learningObjectiveRu: 'Ребёнок считает предметы до 3 и узнаёт числа 1, 2, 3.',
+    parentFollowUpRu: 'Считайте вместе всё вокруг: ступеньки, яблоки, машинки.',
+    newWords: ['один', 'два', 'три', 'сосчитай'],
+  },
+  'numbers-2': {
+    primarySkill: 'counting',
+    secondarySkills: ['classification', 'attention'],
+    learningObjectiveRu: 'Ребёнок считает до 5 и понимает «больше/меньше».',
+    parentFollowUpRu: 'Разложите 5 предметов: «Сосчитай! Где больше?»',
+    newWords: ['четыре', 'пять', 'больше', 'меньше'],
+  },
+  'numbers-3': {
+    primarySkill: 'counting',
+    secondarySkills: ['logical_thinking', 'attention'],
+    learningObjectiveRu: 'Ребёнок считает до 10 и сравнивает количества.',
+    parentFollowUpRu: 'Считайте шаги на прогулке: «Сколько шагов до дерева?»',
+    newWords: ['шесть', 'семь', 'восемь', 'девять', 'десять'],
+  },
+  // === OPPOSITES ===
+  'opposites-1': {
+    primarySkill: 'vocabulary',
+    secondarySkills: ['logical_thinking', 'classification'],
+    learningObjectiveRu: 'Ребёнок понимает противоположности: большой-маленький, горячий-холодный.',
+    parentFollowUpRu: 'Играйте в «наоборот»: вы говорите слово — ребёнок называет противоположное.',
+    newWords: ['большой', 'маленький', 'горячий', 'холодный', 'быстрый', 'медленный'],
+  },
+  'opposites-2': {
+    primarySkill: 'vocabulary',
+    secondarySkills: ['logical_thinking', 'spatial_awareness'],
+    learningObjectiveRu: 'Ребёнок знает противоположности: светлый-тёмный, громкий-тихий, вверх-вниз.',
+    parentFollowUpRu: 'Шепчите и говорите громко: «Это громко или тихо?»',
+    newWords: ['светлый', 'тёмный', 'громкий', 'тихий', 'вверх', 'вниз'],
+  },
+  // === SPATIAL ===
+  'spatial-1': {
+    primarySkill: 'spatial_awareness',
+    secondarySkills: ['receptive_language', 'vocabulary'],
+    learningObjectiveRu: 'Ребёнок понимает предлоги: на, под, в.',
+    parentFollowUpRu: 'Играйте в прятки с игрушкой: «Куда я положил мишку? На стул или под стул?»',
+    newWords: ['на', 'под', 'в', 'над'],
+  },
+  'spatial-2': {
+    primarySkill: 'spatial_awareness',
+    secondarySkills: ['receptive_language', 'vocabulary'],
+    learningObjectiveRu: 'Ребёнок понимает предлоги: за, рядом, между.',
+    parentFollowUpRu: 'Расставьте игрушки: «Поставь мишку МЕЖДУ куклами!»',
+    newWords: ['за', 'рядом', 'между', 'перед'],
+  },
+  // === PHONICS ===
+  'phonics-1': {
+    primarySkill: 'phonological_awareness',
+    secondarySkills: ['attention', 'receptive_language'],
+    learningObjectiveRu: 'Ребёнок определяет первый звук в слове.',
+    parentFollowUpRu: 'Играйте: «С какого звука начинается «ложка»? А «мяч»?»',
+    newWords: ['звук', 'начинается', 'первый'],
+  },
+  'phonics-2': {
+    primarySkill: 'phonological_awareness',
+    secondarySkills: ['attention', 'counting'],
+    learningObjectiveRu: 'Ребёнок делит слова на слоги и считает хлопками.',
+    parentFollowUpRu: 'Хлопайте вместе по слогам: МА-ШИ-НА (3 хлопка!)',
+    newWords: ['слог', 'хлопок', 'длинное', 'короткое'],
+  },
+  // === STORIES ===
+  'stories-1': {
+    primarySkill: 'logical_thinking',
+    secondarySkills: ['receptive_language', 'vocabulary'],
+    learningObjectiveRu: 'Ребёнок расставляет утренние действия по порядку.',
+    parentFollowUpRu: 'Утром спрашивайте: «Что мы делаем сначала? А потом?»',
+    newWords: ['сначала', 'потом', 'утро', 'порядок'],
+  },
+  'stories-2': {
+    primarySkill: 'logical_thinking',
+    secondarySkills: ['vocabulary', 'attention'],
+    learningObjectiveRu: 'Ребёнок понимает порядок шагов в простом деле.',
+    parentFollowUpRu: 'Готовьте вместе: пусть ребёнок говорит, что делать дальше.',
+    newWords: ['шаг', 'дальше', 'готово'],
+  },
+  // === SORTING/MEMORY/MATCH ===
+  'sort-animals': {
+    primarySkill: 'classification',
+    secondarySkills: ['vocabulary', 'logical_thinking'],
+    learningObjectiveRu: 'Ребёнок разделяет животных на домашних и диких.',
+    parentFollowUpRu: 'Спрашивайте: «Кошка — домашнее или дикое? А медведь?»',
+    newWords: ['домашний', 'дикий', 'группа'],
+  },
+  'sort-food': {
+    primarySkill: 'classification',
+    secondarySkills: ['vocabulary', 'logical_thinking'],
+    learningObjectiveRu: 'Ребёнок различает фрукты и овощи.',
+    parentFollowUpRu: 'В магазине: «Это фрукт или овощ? А это?»',
+    newWords: ['фрукт', 'овощ', 'сортировать'],
+  },
+  'memory-animals': {
+    primarySkill: 'working_memory',
+    secondarySkills: ['attention', 'visual_perception'],
+    learningObjectiveRu: 'Ребёнок тренирует память, находя пары животных.',
+    parentFollowUpRu: 'Играйте в «мемори» с настоящими карточками.',
+    newWords: ['пара', 'запомни', 'переверни'],
+  },
+  'memory-colors': {
+    primarySkill: 'working_memory',
+    secondarySkills: ['visual_perception', 'attention'],
+    learningObjectiveRu: 'Ребёнок тренирует память, находя пары цветов.',
+    parentFollowUpRu: 'Вырежьте цветные кружочки — пусть ребёнок ищет пары.',
+    newWords: ['одинаковый', 'такой же', 'цвет'],
+  },
+  'match-animals': {
+    primarySkill: 'classification',
+    secondarySkills: ['vocabulary', 'logical_thinking'],
+    learningObjectiveRu: 'Ребёнок знает детёнышей животных и связывает их с родителями.',
+    parentFollowUpRu: 'Спрашивайте: «Как зовут маленькую кошку? А маленькую собаку?»',
+    newWords: ['котёнок', 'щенок', 'телёнок', 'цыплёнок'],
+  },
+  'assoc-1': {
+    primarySkill: 'receptive_language',
+    secondarySkills: ['vocabulary', 'classification'],
+    learningObjectiveRu: 'Ребёнок связывает звуки с животными.',
+    parentFollowUpRu: 'Издавайте звуки животных — пусть ребёнок угадает!',
+    newWords: ['му-у', 'мяу', 'гав', 'кря-кря'],
+  },
 };
 
 /**

@@ -148,7 +148,7 @@ function AchievementBadge({
 }
 
 export function ProfileScreen() {
-  const { child, streak, progress, rewards } = useAppStore();
+  const { child, streak, progress, rewards, resetProgress, resetAll } = useAppStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [hapticEnabled, setHapticEnabled] = useState(true);
 
@@ -359,9 +359,59 @@ export function ProfileScreen() {
           )}
         </Animated.View>
 
-        {/* App Info */}
+        {/* Reset Actions */}
         <Animated.View
           entering={FadeIn.delay(800)}
+          style={styles.sectionCard}
+        >
+          <Text style={styles.sectionTitle}>Управление</Text>
+          <Pressable
+            onPress={() => {
+              hapticPress();
+              Alert.alert(
+                'Сбросить прогресс?',
+                'Все уроки, XP, серия и награды будут обнулены. Профиль ребёнка сохранится.',
+                [
+                  { text: 'Отмена', style: 'cancel' },
+                  {
+                    text: 'Сбросить',
+                    style: 'destructive',
+                    onPress: () => resetProgress(),
+                  },
+                ]
+              );
+            }}
+            style={styles.resetButton}
+          >
+            <Text style={styles.resetButtonText}>🔄 Сбросить прогресс</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => {
+              hapticPress();
+              Alert.alert(
+                'Начать заново?',
+                'ВСЕ данные будут удалены, включая профиль ребёнка. Вы вернётесь к онбордингу.',
+                [
+                  { text: 'Отмена', style: 'cancel' },
+                  {
+                    text: 'Удалить всё',
+                    style: 'destructive',
+                    onPress: () => resetAll(),
+                  },
+                ]
+              );
+            }}
+            style={[styles.resetButton, styles.resetButtonDanger]}
+          >
+            <Text style={[styles.resetButtonText, styles.resetButtonTextDanger]}>
+              🗑️ Начать заново
+            </Text>
+          </Pressable>
+        </Animated.View>
+
+        {/* App Info */}
+        <Animated.View
+          entering={FadeIn.delay(900)}
           style={styles.appInfo}
         >
           <Text style={styles.appName}>TIMSANICH Kids Edu</Text>
@@ -536,6 +586,27 @@ const styles = StyleSheet.create({
     fontSize: 10,
     opacity: 0.8,
     textAlign: 'center',
+  },
+  resetButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    backgroundColor: Colors.cream,
+    borderRadius: Radius.lg,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  resetButtonDanger: {
+    borderColor: Colors.errorRed + '40',
+    backgroundColor: Colors.errorLight,
+  },
+  resetButtonText: {
+    ...Typography.bodyM,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  resetButtonTextDanger: {
+    color: Colors.errorRed,
   },
   appInfo: {
     alignItems: 'center',

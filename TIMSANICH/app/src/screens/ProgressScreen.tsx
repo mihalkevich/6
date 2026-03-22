@@ -322,10 +322,10 @@ export function ProgressScreen() {
     { name: 'Эмоции', emoji: '💛', key: 'emotional_intelligence' },
   ];
 
-  // Calculate skill levels based on completed lessons per category
+  // Calculate skill levels from real progress data
   const skillLevels = skills.map((skill) => {
-    const level = (progress.skillLevels as Record<string, number>)?.[skill.key] ||
-      Math.floor(Math.random() * 4) + 1; // Fallback for demo
+    const rawLevel = (progress.skillLevels as Record<string, number>)?.[skill.key] || 0;
+    const level = Math.min(10, Math.round(rawLevel));
     return { ...skill, level, maxLevel: 10 };
   });
 

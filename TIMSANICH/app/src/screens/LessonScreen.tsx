@@ -29,6 +29,8 @@ import { useAppStore } from '../store/useAppStore';
 import { getLessonById } from '../data/lessons';
 import { getLessonMeta } from '../data/learningObjectives';
 import { hapticTap, hapticCelebration, hapticHeavy } from '../utils/haptics';
+import { CountingExercise, SortingExercise, MemoryExercise } from '../components/exercises';
+import { scheduleStreakWarning } from '../utils/notifications';
 
 const { width } = Dimensions.get('window');
 
@@ -96,9 +98,13 @@ export function LessonScreen({ lessonId, onComplete, onExit }: LessonScreenProps
       setSelectedId(null);
     } else {
       // Lesson complete
-      completeLesson(lessonId, lesson.xpReward);
+      const accuracy = lesson.units.length > 0 ? score / lesson.units.length : 0;
+      completeLesson(lessonId, lesson.xpReward, accuracy);
       updateLessonStatus(lessonId, 'completed');
       incrementStreak();
+
+      // Schedule streak warning notification
+      scheduleStreakWarning('', 1).catch(() => {});
 
       const isPerfect = score + (answerState === 'correct' ? 0 : -1) + 1 === lesson.units.length;
 
@@ -297,24 +303,72 @@ export function LessonScreen({ lessonId, onComplete, onExit }: LessonScreenProps
           )}
         </Animated.View>
 
-        {/* Options */}
-        <View style={[
-          styles.optionsContainer,
-          useListLayout ? styles.optionsList : styles.optionsGrid,
-        ]}>
-          {unit.options.map((option, i) => (
-            <DuoOptionCard
-              key={option.id}
-              emoji={option.emoji}
-              label={option.label}
-              onPress={() => handleAnswer(option.id)}
-              state={getOptionState(option.id) as any}
-              layout={useListLayout ? 'list' : 'grid'}
-              index={i}
-              disabled={answerState !== 'unanswered'}
-            />
-          ))}
-        </View>
+        {/* Exercise content — switch by type */}
+        {unit.type === 'counting' && unit.emoji ? (
+          <CountingExercise
+            questionRu={unit.questionRu}
+            emoji={unit.emoji}
+            count={unit.options.length}
+            options={unit.options}
+            correctAnswerId={unit.correctAnswerId}
+            onAnswer={(correct) => {
+              setAnswerState(correct ? 'correct' : 'incorrect');
+              if (correct) setScore((s) => s + 1);
+            }}
+            answered={answerState !== 'unanswered'}
+            selectedId={selectedId}
+          />
+        ) : unit.type === 'sorting' ? (
+          <SortingExercise
+            questionRu={unit.questionRu}
+            buckets={[
+              { id: 'a', label: unit.options[0]?.label || 'A', emoji: unit.options[0]?.emoji || '📦', color: Colors.primary },
+              { id: 'b', label: unit.options[1]?.label || 'B', emoji: unit.options[1]?.emoji || '📦', color: Colors.warningAmber },
+            ]}
+            items={unit.options.slice(2).map((o) => ({
+              id: o.id,
+              emoji: o.emoji || '❓',
+              label: o.label,
+              bucketId: o.id.includes('-a') ? 'a' : 'b',
+            }))}
+            onComplete={(accuracy) => {
+              const correct = accuracy >= 0.6;
+              setAnswerState(correct ? 'correct' : 'incorrect');
+              if (correct) setScore((s) => s + 1);
+            }}
+          />
+        ) : unit.type === 'memory_cards' ? (
+          <MemoryExercise
+            cards={unit.options.map((o, i) => ({
+              id: o.id,
+              emoji: o.emoji || '❓',
+              pairId: `pair-${Math.floor(i / 2)}`,
+            }))}
+            onComplete={(moves) => {
+              setAnswerState('correct');
+              setScore((s) => s + 1);
+            }}
+          />
+        ) : (
+          /* Default: DuoOptionCard grid/list */
+          <View style={[
+            styles.optionsContainer,
+            useListLayout ? styles.optionsList : styles.optionsGrid,
+          ]}>
+            {unit.options.map((option, i) => (
+              <DuoOptionCard
+                key={option.id}
+                emoji={option.emoji}
+                label={option.label}
+                onPress={() => handleAnswer(option.id)}
+                state={getOptionState(option.id) as any}
+                layout={useListLayout ? 'list' : 'grid'}
+                index={i}
+                disabled={answerState !== 'unanswered'}
+              />
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Result Feedback Bar */}

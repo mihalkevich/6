@@ -85,15 +85,28 @@ export function generateDailyPlan(
     });
   }
 
-  // 1 review lesson from completed
+  // 1-2 review lessons — prioritize by spaced repetition logic
   if (completed.length > 0) {
-    const reviewLesson = completed[Math.floor(Math.random() * completed.length)];
-    planned.push({
-      lessonId: reviewLesson.id,
-      status: 'pending',
-      score: 0,
-      isReview: true,
+    // Simple spaced repetition: prefer older completions (longer since review)
+    const sortedByAge = [...completed].sort((a, b) => {
+      const aIndex = completedLessonIds.indexOf(a.id);
+      const bIndex = completedLessonIds.indexOf(b.id);
+      return aIndex - bIndex; // Earlier completed = higher priority for review
     });
+    const reviewCount = Math.min(
+      Math.ceil(lessonCount * 0.3), // ~30% reviews
+      sortedByAge.length,
+      2 // max 2 reviews
+    );
+    for (let i = 0; i < reviewCount; i++) {
+      if (planned.length >= lessonCount) break;
+      planned.push({
+        lessonId: sortedByAge[i].id,
+        status: 'pending',
+        score: 0,
+        isReview: true,
+      });
+    }
   }
 
   // If not enough, add more from available
