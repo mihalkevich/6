@@ -9,6 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@bittingz/expo-widgets": "^3.0.2",
     "@expo/vector-icons": "^14.0.0",
     "@react-native-async-storage/async-storage": "2.1.2",
     "@react-navigation/bottom-tabs": "^7.0.0",
@@ -22,14 +23,17 @@
     "expo-linking": "~55.0.8",
     "expo-notifications": "~55.0.9",
     "expo-router": "~5.1.11",
+    "expo-shared-preferences": "^0.4.0",
     "expo-splash-screen": "~55.0.12",
     "expo-status-bar": "~55.0.4",
     "react": "19.2.0",
     "react-native": "0.83.2",
+    "react-native-android-widget": "^0.20.1",
     "react-native-gesture-handler": "~2.25.0",
     "react-native-reanimated": "~3.19.1",
     "react-native-safe-area-context": "~5.4.0",
     "react-native-screens": "~4.11.1",
+    "react-native-svg": "^15.15.4",
     "zustand": "^5.0.0"
   },
   "devDependencies": {
