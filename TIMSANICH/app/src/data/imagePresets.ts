@@ -1,194 +1,618 @@
-import type { ImagePreset } from '../types/imagePresets';
+import { ImagePreset, ImagePrompt } from '../types/imagePresets';
 
-const princessPreset: ImagePreset = {
-  id: 'princess',
+// =============================================================================
+// Preset 1: Magic Princess
+// =============================================================================
+
+const princessPrompts: ImagePrompt[] = [
+  {
+    id: 'princess_1',
+    prompt: 'A little girl wearing a sparkling pink princess gown standing at the grand entrance of a fairy-tale castle, golden crown on her head, soft sunset light',
+    promptRu: 'Маленькая девочка в сверкающем розовом платье принцессы стоит у парадного входа в сказочный замок, золотая корона на голове, мягкий закатный свет',
+    styleTags: ['fantasy', 'princess', 'castle', 'golden_hour'],
+    poseHint: 'Standing tall with one hand gently touching the crown',
+    poseHintRu: 'Стоит прямо, одной рукой нежно касаясь короны',
+    order: 1,
+  },
+  {
+    id: 'princess_2',
+    prompt: 'A young princess sitting on a velvet throne in a grand ballroom, crystal chandelier above, rose petals scattered on the marble floor',
+    promptRu: 'Юная принцесса сидит на бархатном троне в парадном бальном зале, хрустальная люстра наверху, лепестки роз рассыпаны по мраморному полу',
+    styleTags: ['royal', 'ballroom', 'elegant', 'chandelier'],
+    poseHint: 'Sitting gracefully with hands folded in lap',
+    poseHintRu: 'Сидит грациозно, сложив руки на коленях',
+    order: 2,
+  },
+  {
+    id: 'princess_3',
+    prompt: 'A princess twirling in a glittering ball gown in a moonlit castle garden, fireflies glowing around her, tiara sparkling',
+    promptRu: 'Принцесса кружится в сверкающем бальном платье в залитом лунным светом замковом саду, светлячки мерцают вокруг неё, тиара сверкает',
+    styleTags: ['dance', 'moonlight', 'garden', 'magical'],
+    poseHint: 'Mid-twirl with dress flowing outward',
+    poseHintRu: 'В кружении, платье развевается',
+    order: 3,
+  },
+  {
+    id: 'princess_4',
+    prompt: 'A little princess reading a golden storybook in a tower room with arched windows overlooking a kingdom, plush cushions everywhere',
+    promptRu: 'Маленькая принцесса читает золотую книгу сказок в башенной комнате с арочными окнами с видом на королевство, повсюду мягкие подушки',
+    styleTags: ['cozy', 'tower', 'storybook', 'kingdom_view'],
+    poseHint: 'Sitting cross-legged with the book open on her lap',
+    poseHintRu: 'Сидит по-турецки с открытой книгой на коленях',
+    order: 4,
+  },
+  {
+    id: 'princess_5',
+    prompt: 'A princess waving from a decorated royal carriage pulled by white horses, confetti in the air, cheering crowd in the background',
+    promptRu: 'Принцесса машет рукой из украшенной королевской кареты, запряжённой белыми лошадьми, конфетти в воздухе, ликующая толпа на заднем плане',
+    styleTags: ['parade', 'carriage', 'celebration', 'royal'],
+    poseHint: 'Waving gracefully with a big smile',
+    poseHintRu: 'Грациозно машет рукой с широкой улыбкой',
+    order: 5,
+  },
+  {
+    id: 'princess_6',
+    prompt: 'A young princess having a tea party with stuffed animal friends on a castle balcony, tiny porcelain cups, flower garlands draped around',
+    promptRu: 'Юная принцесса устраивает чаепитие с плюшевыми друзьями-зверятами на балконе замка, крошечные фарфоровые чашечки, цветочные гирлянды вокруг',
+    styleTags: ['tea_party', 'balcony', 'cute', 'whimsical'],
+    poseHint: 'Lifting a tiny cup as if making a toast',
+    poseHintRu: 'Поднимает крошечную чашечку, будто произнося тост',
+    order: 6,
+  },
+  {
+    id: 'princess_7',
+    prompt: 'A princess standing before a magic mirror in a jewel-encrusted frame, her reflection wearing a different colored gown, sparkles emanating from the glass',
+    promptRu: 'Принцесса стоит перед волшебным зеркалом в украшенной драгоценностями раме, её отражение в платье другого цвета, искры исходят от стекла',
+    styleTags: ['magic', 'mirror', 'sparkle', 'mysterious'],
+    poseHint: 'One hand reaching toward the mirror surface',
+    poseHintRu: 'Одна рука тянется к поверхности зеркала',
+    order: 7,
+  },
+  {
+    id: 'princess_8',
+    prompt: 'A princess dancing with a friendly dragon in a castle courtyard under a sky full of stars, dragon breathing gentle golden sparks',
+    promptRu: 'Принцесса танцует с дружелюбным драконом во дворе замка под небом, полным звёзд, дракон выдыхает нежные золотые искры',
+    styleTags: ['dragon', 'dance', 'starry_night', 'fantasy'],
+    poseHint: 'Dancing hand-in-hand with the dragon, laughing',
+    poseHintRu: 'Танцует, держа дракона за лапу, смеётся',
+    order: 8,
+  },
+];
+
+const magicPrincessPreset: ImagePreset = {
+  id: 'magic_princess',
   name: 'Magic Princess',
   nameRu: 'Волшебная принцесса',
-  description: 'Royal photo session with crowns, castles and magic',
-  descriptionRu: 'Королевская фотосессия с коронами, замками и волшебством',
+  description: 'A royal photo session in a fairy-tale castle with crowns, gowns, and magical moments',
+  descriptionRu: 'Королевская фотосессия в сказочном замке с коронами, платьями и волшебными моментами',
   category: 'princess',
   emoji: '👸',
   accentColor: '#FF69B4',
   author: 'NanaBanana',
   difficulty: 'easy',
   photoCount: 8,
+  prompts: princessPrompts,
   isPremium: false,
-  tags: ['princess', 'castle', 'crown', 'dress'],
+  tags: ['princess', 'castle', 'crown', 'royal', 'fairy-tale', 'gown', 'magic'],
   ageMin: 3,
   ageMax: 8,
-  prompts: [
-    { id: 'princess_1', prompt: 'A little girl wearing a sparkling diamond tiara and a fluffy pink ball gown, standing in front of a grand castle entrance at golden hour', promptRu: 'Маленькая девочка в сверкающей бриллиантовой тиаре и пышном розовом бальном платье стоит перед входом в величественный замок на закате', styleTags: ['royal', 'golden_hour', 'sparkle', 'pink'], poseHint: 'Standing tall with hands gently holding the dress skirt', poseHintRu: 'Стоит ровно, нежно придерживая юбку платья', order: 1 },
-    { id: 'princess_2', prompt: 'A young princess waving a glowing magic wand with golden sparks flying around her in a moonlit garden', promptRu: 'Юная принцесса взмахивает светящейся волшебной палочкой, вокруг неё летят золотые искры в лунном саду', styleTags: ['magic', 'moonlit', 'golden', 'sparkle'], order: 2 },
-    { id: 'princess_3', prompt: 'A girl in a silver dress carefully walking up a crystal glass staircase that glows with soft blue light', promptRu: 'Девочка в серебряном платье осторожно поднимается по хрустальной лестнице, которая светится мягким голубым светом', styleTags: ['crystal', 'silver', 'glow', 'elegant'], poseHint: 'One hand on the railing, looking up gracefully', poseHintRu: 'Одна рука на перилах, грациозно смотрит вверх', order: 3 },
-    { id: 'princess_4', prompt: 'A little princess sitting on a golden throne surrounded by blooming roses of every color in a secret garden', promptRu: 'Маленькая принцесса сидит на золотом троне в окружении цветущих роз всех цветов в тайном саду', styleTags: ['royal', 'roses', 'garden', 'golden'], order: 4 },
-    { id: 'princess_5', prompt: 'A girl stepping into a crystal carriage pulled by white unicorns under a sky full of stars', promptRu: 'Девочка садится в хрустальную карету, запряжённую белыми единорогами под звёздным небом', styleTags: ['fantasy', 'crystal', 'unicorn', 'starry'], poseHint: 'Reaching one hand toward the carriage door', poseHintRu: 'Протягивает руку к дверце кареты', order: 5 },
-    { id: 'princess_6', prompt: 'A princess standing on a castle balcony watching shooting stars cross the velvet night sky', promptRu: 'Принцесса стоит на балконе замка и наблюдает за падающими звёздами на бархатном ночном небе', styleTags: ['night', 'starry', 'romantic', 'balcony'], order: 6 },
-    { id: 'princess_7', prompt: 'A girl looking into an enchanted mirror that shows her reflection wearing a glowing crown of flowers', promptRu: 'Девочка смотрит в зачарованное зеркало, которое показывает её отражение в светящейся цветочной короне', styleTags: ['magic', 'mirror', 'flowers', 'glow'], poseHint: 'One hand touching the mirror surface', poseHintRu: 'Одна рука касается поверхности зеркала', order: 7 },
-    { id: 'princess_8', prompt: 'A princess hosting an elegant tea party with her stuffed animal friends at a table set with golden cups and cupcakes', promptRu: 'Принцесса устраивает изысканное чаепитие с друзьями-мягкими игрушками за столиком с золотыми чашками и капкейками', styleTags: ['tea_party', 'cute', 'golden', 'cozy'], order: 8 },
-  ],
 };
+
+// =============================================================================
+// Preset 2: Flower Fairy
+// =============================================================================
+
+const flowerFairyPrompts: ImagePrompt[] = [
+  {
+    id: 'fairy_1',
+    prompt: 'A little girl with translucent butterfly wings standing in a sunlit meadow full of wildflowers, pollen dust sparkling in the air',
+    promptRu: 'Маленькая девочка с прозрачными крылышками бабочки стоит на солнечном лугу, полном полевых цветов, пыльца сверкает в воздухе',
+    styleTags: ['fairy', 'meadow', 'wildflowers', 'sunlight'],
+    poseHint: 'Standing with arms slightly open, palms up, catching pollen',
+    poseHintRu: 'Стоит с слегка разведёнными руками, ладонями вверх, ловит пыльцу',
+    order: 1,
+  },
+  {
+    id: 'fairy_2',
+    prompt: 'A flower fairy sleeping inside a giant rose bloom, soft morning dew on the petals, tiny ladybugs nearby',
+    promptRu: 'Цветочная фея спит внутри гигантского бутона розы, мягкая утренняя роса на лепестках, крошечные божьи коровки рядом',
+    styleTags: ['sleeping', 'rose', 'dew', 'miniature'],
+    poseHint: 'Curled up peacefully inside the flower',
+    poseHintRu: 'Свернувшись калачиком мирно внутри цветка',
+    order: 2,
+  },
+  {
+    id: 'fairy_3',
+    prompt: 'A fairy girl flying above a colorful tulip garden, iridescent wings catching rainbow light, trailing sparkle dust behind her',
+    promptRu: 'Девочка-фея летит над разноцветным садом тюльпанов, радужные крылья ловят свет, за ней вьётся блестящая пыльца',
+    styleTags: ['flying', 'tulips', 'rainbow', 'sparkle'],
+    poseHint: 'Arms stretched forward in graceful flight',
+    poseHintRu: 'Руки вытянуты вперёд в грациозном полёте',
+    order: 3,
+  },
+  {
+    id: 'fairy_4',
+    prompt: 'A little fairy sitting on a mushroom cap in an enchanted garden, painting flowers with a tiny magic wand that leaves trails of color',
+    promptRu: 'Маленькая фея сидит на шляпке гриба в волшебном саду, раскрашивает цветы крошечной волшебной палочкой, оставляющей следы цвета',
+    styleTags: ['mushroom', 'magic_wand', 'painting', 'enchanted'],
+    poseHint: 'Sitting on the mushroom, leaning forward with the wand',
+    poseHintRu: 'Сидит на грибе, наклонившись вперёд с палочкой',
+    order: 4,
+  },
+  {
+    id: 'fairy_5',
+    prompt: 'A fairy girl weaving a flower crown from daisies and lavender while sitting beside a babbling brook, dragonflies hovering nearby',
+    promptRu: 'Девочка-фея плетёт цветочный венок из ромашек и лаванды, сидя у журчащего ручья, стрекозы парят рядом',
+    styleTags: ['flower_crown', 'brook', 'crafting', 'peaceful'],
+    poseHint: 'Sitting with legs to one side, fingers delicately weaving flowers',
+    poseHintRu: 'Сидит, ножки в сторону, пальцы нежно плетут цветы',
+    order: 5,
+  },
+  {
+    id: 'fairy_6',
+    prompt: 'A fairy dancing with bumblebees in a sunflower field, wearing a dress made of petals, golden afternoon light',
+    promptRu: 'Фея танцует с шмелями на подсолнечном поле, в платье из лепестков, золотой послеобеденный свет',
+    styleTags: ['dance', 'bumblebees', 'sunflowers', 'petal_dress'],
+    poseHint: 'Spinning with arms out, bees circling playfully',
+    poseHintRu: 'Кружится с раскинутыми руками, шмели весело кружат вокруг',
+    order: 6,
+  },
+  {
+    id: 'fairy_7',
+    prompt: 'A fairy girl holding a glowing lantern in a garden at twilight, fireflies gathering around her, tiny fairy houses visible among the flowers',
+    promptRu: 'Девочка-фея держит светящийся фонарик в саду в сумерках, светлячки собираются вокруг неё, среди цветов видны крошечные домики фей',
+    styleTags: ['twilight', 'lantern', 'fireflies', 'fairy_houses'],
+    poseHint: 'Holding lantern at chest height, looking down at the fairy village',
+    poseHintRu: 'Держит фонарик на уровне груди, смотрит вниз на деревню фей',
+    order: 7,
+  },
+];
 
 const flowerFairyPreset: ImagePreset = {
   id: 'flower_fairy',
   name: 'Flower Fairy',
   nameRu: 'Цветочная фея',
-  description: 'Enchanted garden sessions with petals, wings and magic flowers',
-  descriptionRu: 'Волшебные сессии в саду с лепестками, крыльями и магическими цветами',
+  description: 'A magical garden adventure with butterfly wings, enchanted flowers, and fairy dust',
+  descriptionRu: 'Волшебное приключение в саду с крылышками бабочки, заколдованными цветами и пыльцой фей',
   category: 'fairy_tale',
   emoji: '🧚',
   accentColor: '#7BC67E',
   author: 'NanaBanana',
   difficulty: 'easy',
   photoCount: 7,
+  prompts: flowerFairyPrompts,
   isPremium: false,
-  tags: ['fairy', 'flowers', 'garden', 'wings'],
+  tags: ['fairy', 'flowers', 'wings', 'garden', 'nature', 'magical', 'butterflies'],
   ageMin: 3,
   ageMax: 8,
-  prompts: [
-    { id: 'fairy_1', prompt: 'A tiny fairy girl with iridescent petal wings standing in a sunrise garden among giant sunflowers', promptRu: 'Маленькая фея с переливающимися крыльями из лепестков стоит в утреннем саду среди гигантских подсолнухов', styleTags: ['sunrise', 'petals', 'wings', 'garden'], poseHint: 'Wings spread wide, arms slightly raised', poseHintRu: 'Крылья широко расправлены, руки слегка подняты', order: 1 },
-    { id: 'fairy_2', prompt: 'A fairy sitting on a large leaf covered in sparkling morning dewdrops, combing her hair with a tiny flower comb', promptRu: 'Фея сидит на большом листке, покрытом сверкающими утренними капельками росы, расчёсывая волосы маленьким цветочным гребешком', styleTags: ['morning', 'dewdrop', 'delicate', 'nature'], order: 2 },
-    { id: 'fairy_3', prompt: 'A girl blowing on a giant dandelion, its seeds turning into tiny glowing fairies as they float away', promptRu: 'Девочка дует на гигантский одуванчик, его семена превращаются в крошечных светящихся фей, улетая вдаль', styleTags: ['dandelion', 'magical', 'glow', 'whimsical'], poseHint: 'Leaning slightly forward, lips pursed to blow', poseHintRu: 'Слегка наклонилась вперёд, губы сложены, чтобы дуть', order: 3 },
-    { id: 'fairy_4', prompt: 'A fairy queen sitting on a throne made of intertwined tulips in a secret meadow with butterflies all around', promptRu: 'Королева фей сидит на троне из переплетённых тюльпанов на тайной полянке, вокруг порхают бабочки', styleTags: ['tulips', 'throne', 'butterflies', 'meadow'], order: 4 },
-    { id: 'fairy_5', prompt: 'A girl wearing a crown of living butterflies that gently open and close their wings on her head', promptRu: 'Девочка в короне из живых бабочек, которые нежно раскрывают и закрывают крылышки на её голове', styleTags: ['butterflies', 'crown', 'living', 'gentle'], order: 5 },
-    { id: 'fairy_6', prompt: 'A fairy dancing on the surface of a moonlit pond, her feet creating ripples of silver light', promptRu: 'Фея танцует на поверхности лунного пруда, её ножки создают рябь серебристого света', styleTags: ['moonlit', 'pond', 'silver', 'dance'], poseHint: 'One foot pointed on the water, arms in ballet pose', poseHintRu: 'Одна ножка на воде, руки в балетной позе', order: 6 },
-    { id: 'fairy_7', prompt: 'A fairy flying through endless fields of lavender at sunset, leaving a trail of sparkling dust behind her', promptRu: 'Фея летит через бескрайние лавандовые поля на закате, оставляя за собой след из сверкающей пыльцы', styleTags: ['lavender', 'sunset', 'flying', 'sparkle'], order: 7 },
-  ],
 };
 
-const underwaterPreset: ImagePreset = {
-  id: 'underwater',
+// =============================================================================
+// Preset 3: Underwater Kingdom
+// =============================================================================
+
+const underwaterPrompts: ImagePrompt[] = [
+  {
+    id: 'underwater_1',
+    prompt: 'A little mermaid girl sitting on a giant seashell throne in an underwater palace, colorful coral pillars, bioluminescent fish swimming around',
+    promptRu: 'Маленькая девочка-русалка сидит на троне из гигантской ракушки в подводном дворце, разноцветные коралловые колонны, биолюминесцентные рыбки плавают вокруг',
+    styleTags: ['mermaid', 'seashell', 'palace', 'bioluminescent'],
+    poseHint: 'Seated regally on the shell with tail draped elegantly',
+    poseHintRu: 'Сидит величественно на ракушке, хвост элегантно свисает',
+    order: 1,
+  },
+  {
+    id: 'underwater_2',
+    prompt: 'A mermaid girl swimming through a coral reef archway surrounded by tropical fish, sunlight filtering through the water surface above',
+    promptRu: 'Девочка-русалка проплывает через арку кораллового рифа, окружённая тропическими рыбками, солнечный свет проникает сквозь поверхность воды сверху',
+    styleTags: ['swimming', 'coral_reef', 'tropical_fish', 'sunrays'],
+    poseHint: 'Arms forward in a graceful swimming pose',
+    poseHintRu: 'Руки вперёд в грациозной позе плавания',
+    order: 2,
+  },
+  {
+    id: 'underwater_3',
+    prompt: 'A young mermaid playing with a friendly dolphin near a sunken treasure chest overflowing with pearls and gems, kelp forest in the background',
+    promptRu: 'Юная русалка играет с дружелюбным дельфином рядом с затонувшим сундуком сокровищ, полным жемчуга и драгоценностей, лес ламинарий на заднем плане',
+    styleTags: ['dolphin', 'treasure', 'pearls', 'kelp_forest'],
+    poseHint: 'Hugging the dolphin, both looking at the camera',
+    poseHintRu: 'Обнимает дельфина, оба смотрят в камеру',
+    order: 3,
+  },
+  {
+    id: 'underwater_4',
+    prompt: 'A mermaid girl brushing her hair with a pearl comb while sitting on a rock near a glowing underwater volcano, warm orange and blue tones',
+    promptRu: 'Девочка-русалка расчёсывает волосы жемчужным гребнем, сидя на скале рядом со светящимся подводным вулканом, тёплые оранжево-голубые тона',
+    styleTags: ['grooming', 'volcano', 'warm_tones', 'rock'],
+    poseHint: 'Sitting sideways, combing long flowing hair',
+    poseHintRu: 'Сидит боком, расчёсывая длинные развевающиеся волосы',
+    order: 4,
+  },
+  {
+    id: 'underwater_5',
+    prompt: 'A little mermaid hosting a concert for sea creatures, singing into a spiral shell microphone, seahorses and starfish as the audience',
+    promptRu: 'Маленькая русалка даёт концерт для морских обитателей, поёт в спиральную ракушку-микрофон, морские коньки и морские звёзды в качестве зрителей',
+    styleTags: ['singing', 'concert', 'sea_creatures', 'shell'],
+    poseHint: 'Holding shell near mouth, mouth open in song',
+    poseHintRu: 'Держит ракушку у рта, рот открыт в пении',
+    order: 5,
+  },
+  {
+    id: 'underwater_6',
+    prompt: 'A mermaid girl riding a giant sea turtle through an underwater garden of sea anemones and glowing jellyfish, peaceful and serene',
+    promptRu: 'Девочка-русалка катается на гигантской морской черепахе через подводный сад актиний и светящихся медуз, спокойно и безмятежно',
+    styleTags: ['sea_turtle', 'jellyfish', 'anemone', 'serene'],
+    poseHint: 'Lying on the turtle shell, chin on hands, looking ahead',
+    poseHintRu: 'Лежит на панцире черепахи, подбородок на руках, смотрит вперёд',
+    order: 6,
+  },
+  {
+    id: 'underwater_7',
+    prompt: 'A mermaid collecting glowing pearls from giant oysters in a deep sea cave, walls covered in sparkling crystals, mysterious blue light',
+    promptRu: 'Русалка собирает светящийся жемчуг из гигантских устриц в глубоководной пещере, стены покрыты сверкающими кристаллами, таинственный голубой свет',
+    styleTags: ['cave', 'pearls', 'crystals', 'mysterious'],
+    poseHint: 'Reaching into an oyster with wonder on her face',
+    poseHintRu: 'Тянется к устрице с восхищением на лице',
+    order: 7,
+  },
+  {
+    id: 'underwater_8',
+    prompt: 'A mermaid princess with a crown of coral and pearls waving to an underwater parade of whales, manta rays, and schools of rainbow fish',
+    promptRu: 'Принцесса-русалка с короной из коралла и жемчуга машет подводному параду китов, мант и стай радужных рыбок',
+    styleTags: ['parade', 'whales', 'crown', 'celebration'],
+    poseHint: 'Floating upright, waving with a joyful expression',
+    poseHintRu: 'Парит вертикально, машет с радостным выражением',
+    order: 8,
+  },
+];
+
+const underwaterKingdomPreset: ImagePreset = {
+  id: 'underwater_kingdom',
   name: 'Underwater Kingdom',
   nameRu: 'Подводное царство',
-  description: 'Dive into the ocean with mermaids, corals and sea creatures',
-  descriptionRu: 'Погружение в океан с русалками, кораллами и морскими обитателями',
+  description: 'Dive into an ocean adventure with mermaids, dolphins, and sparkling coral reefs',
+  descriptionRu: 'Погрузитесь в океанское приключение с русалками, дельфинами и сверкающими коралловыми рифами',
   category: 'underwater',
   emoji: '🧜‍♀️',
   accentColor: '#4FC3F7',
   author: 'NanaBanana',
   difficulty: 'medium',
   photoCount: 8,
+  prompts: underwaterPrompts,
   isPremium: false,
-  tags: ['mermaid', 'ocean', 'coral', 'fish'],
+  tags: ['mermaid', 'ocean', 'coral', 'fish', 'underwater', 'sea', 'dolphins'],
   ageMin: 3,
   ageMax: 8,
-  prompts: [
-    { id: 'underwater_1', prompt: 'A young mermaid with a shimmering turquoise tail resting on a vibrant coral reef surrounded by colorful tropical fish', promptRu: 'Юная русалка с переливающимся бирюзовым хвостом отдыхает на ярком коралловом рифе в окружении разноцветных тропических рыбок', styleTags: ['mermaid', 'coral', 'turquoise', 'tropical'], poseHint: 'Sitting on coral, tail curled elegantly', poseHintRu: 'Сидит на коралле, хвост элегантно изогнут', order: 1 },
-    { id: 'underwater_2', prompt: 'A girl discovering an ancient treasure cave filled with glowing pearls and golden coins, light streaming through the water above', promptRu: 'Девочка обнаруживает древнюю пещеру сокровищ, полную светящихся жемчужин и золотых монет, свет проникает сквозь воду сверху', styleTags: ['treasure', 'pearls', 'cave', 'golden'], order: 2 },
-    { id: 'underwater_3', prompt: 'A mermaid girl riding on the back of a friendly dolphin through crystal clear blue waters', promptRu: 'Русалочка мчится верхом на дружелюбном дельфине сквозь кристально чистые голубые воды', styleTags: ['dolphin', 'riding', 'blue', 'adventure'], poseHint: 'Arms around the dolphin, hair flowing behind', poseHintRu: 'Обнимает дельфина руками, волосы развеваются', order: 3 },
-    { id: 'underwater_4', prompt: 'A girl wearing a magnificent crown made of seashells and starfish, sitting on an underwater rock', promptRu: 'Девочка в великолепной короне из морских раковин и морских звёзд сидит на подводной скале', styleTags: ['crown', 'seashells', 'starfish', 'royal'], order: 4 },
-    { id: 'underwater_5', prompt: 'A mermaid swimming among giant bioluminescent jellyfish that glow in purple and blue in the deep ocean', promptRu: 'Русалка плывёт среди гигантских биолюминесцентных медуз, светящихся фиолетовым и голубым в глубинах океана', styleTags: ['jellyfish', 'bioluminescent', 'deep_sea', 'glow'], poseHint: 'Reaching one hand toward a jellyfish', poseHintRu: 'Протягивает руку к медузе', order: 5 },
-    { id: 'underwater_6', prompt: 'A girl exploring a sunken ancient palace with marble columns covered in coral and sea anemones', promptRu: 'Девочка исследует затонувший древний дворец с мраморными колоннами, покрытыми кораллами и морскими анемонами', styleTags: ['palace', 'ancient', 'marble', 'exploration'], order: 6 },
-    { id: 'underwater_7', prompt: 'A mermaid traveling on the back of a gentle giant sea turtle through a kelp forest', promptRu: 'Русалка путешествует верхом на огромной нежной морской черепахе через лес из ламинарий', styleTags: ['sea_turtle', 'kelp', 'journey', 'gentle'], order: 7 },
-    { id: 'underwater_8', prompt: 'A mermaid girl floating at the ocean surface under a full moon, her tail reflecting moonlight like diamonds', promptRu: 'Русалочка плывёт по поверхности океана под полной луной, её хвост отражает лунный свет как бриллианты', styleTags: ['moonlit', 'surface', 'diamonds', 'night'], poseHint: 'Floating on back, face toward the moon', poseHintRu: 'Лежит на спине, лицо обращено к луне', order: 8 },
-  ],
 };
 
-const spaceGirlPreset: ImagePreset = {
-  id: 'space_girl',
+// =============================================================================
+// Preset 4: Space Traveler
+// =============================================================================
+
+const spaceTravelerPrompts: ImagePrompt[] = [
+  {
+    id: 'space_1',
+    prompt: 'A little girl astronaut floating in zero gravity inside a colorful spaceship, stars visible through the round window, stuffed animals floating around her',
+    promptRu: 'Маленькая девочка-космонавт парит в невесомости внутри разноцветного космического корабля, звёзды видны через круглый иллюминатор, плюшевые игрушки парят вокруг неё',
+    styleTags: ['astronaut', 'spaceship', 'zero_gravity', 'stars'],
+    poseHint: 'Floating with arms spread, hair flowing upward in zero gravity',
+    poseHintRu: 'Парит с раскинутыми руками, волосы поднимаются вверх в невесомости',
+    order: 1,
+  },
+  {
+    id: 'space_2',
+    prompt: 'A girl in a sparkly space suit planting a glowing flower on the surface of the moon, Earth visible in the background, cosmic dust swirling',
+    promptRu: 'Девочка в блестящем космическом костюме сажает светящийся цветок на поверхности Луны, Земля видна на заднем плане, космическая пыль кружится',
+    styleTags: ['moon', 'planting', 'earth_view', 'cosmic'],
+    poseHint: 'Kneeling on the moon surface, gently placing the flower',
+    poseHintRu: 'На коленях на поверхности Луны, нежно сажает цветок',
+    order: 2,
+  },
+  {
+    id: 'space_3',
+    prompt: 'A young space explorer riding a shooting star through a nebula of purple and blue clouds, trail of stardust behind her, galaxies in the distance',
+    promptRu: 'Юная космическая путешественница мчится на падающей звезде через туманность из фиолетовых и голубых облаков, след звёздной пыли за ней, галактики вдали',
+    styleTags: ['shooting_star', 'nebula', 'stardust', 'galaxies'],
+    poseHint: 'Sitting on the star with arms raised in excitement',
+    poseHintRu: 'Сидит на звезде с поднятыми руками от восторга',
+    order: 3,
+  },
+  {
+    id: 'space_4',
+    prompt: 'A girl astronaut having a picnic on the rings of Saturn, colorful blanket spread on the icy ring, thermos of hot cocoa, planet looming beautifully behind',
+    promptRu: 'Девочка-космонавт устраивает пикник на кольцах Сатурна, разноцветное одеяло на ледяном кольце, термос с горячим какао, планета величественно возвышается позади',
+    styleTags: ['saturn', 'picnic', 'rings', 'whimsical'],
+    poseHint: 'Sitting cross-legged on the blanket, holding a cup',
+    poseHintRu: 'Сидит по-турецки на одеяле, держит чашку',
+    order: 4,
+  },
+  {
+    id: 'space_5',
+    prompt: 'A little space traveler meeting friendly alien creatures on a planet with pink grass and two suns, alien flowers blooming, warm welcoming scene',
+    promptRu: 'Маленькая космическая путешественница встречает дружелюбных инопланетных существ на планете с розовой травой и двумя солнцами, инопланетные цветы цветут, тёплая приветливая сцена',
+    styleTags: ['aliens', 'alien_planet', 'friendly', 'two_suns'],
+    poseHint: 'Shaking hands with a cute alien, both smiling',
+    poseHintRu: 'Пожимает руку милому инопланетянину, оба улыбаются',
+    order: 5,
+  },
+  {
+    id: 'space_6',
+    prompt: 'A girl space captain standing on the bridge of her starship, holographic star map glowing before her, constellation patterns on the ceiling, confident pose',
+    promptRu: 'Девочка-капитан стоит на мостике своего звездолёта, голографическая карта звёзд светится перед ней, узоры созвездий на потолке, уверенная поза',
+    styleTags: ['captain', 'starship', 'hologram', 'bridge'],
+    poseHint: 'Standing with hands on hips, looking at the star map',
+    poseHintRu: 'Стоит руки в боки, смотрит на карту звёзд',
+    order: 6,
+  },
+];
+
+const spaceTravelerPreset: ImagePreset = {
+  id: 'space_traveler',
   name: 'Space Traveler',
   nameRu: 'Космическая путешественница',
-  description: 'Adventures among stars, planets and nebulas',
-  descriptionRu: 'Приключения среди звёзд, планет и туманностей',
+  description: 'Blast off into space with stars, planets, and cosmic adventures beyond imagination',
+  descriptionRu: 'Отправляйтесь в космос со звёздами, планетами и космическими приключениями за пределами воображения',
   category: 'space',
   emoji: '🚀',
   accentColor: '#AB47BC',
   author: 'NanaBanana',
   difficulty: 'creative',
   photoCount: 6,
+  prompts: spaceTravelerPrompts,
   isPremium: true,
-  tags: ['space', 'stars', 'planets', 'astronaut'],
-  ageMin: 4,
+  tags: ['space', 'stars', 'planets', 'astronaut', 'cosmic', 'galaxy', 'moon'],
+  ageMin: 3,
   ageMax: 8,
-  prompts: [
-    { id: 'space_1', prompt: 'A girl in a cute pink spacesuit floating among thousands of twinkling stars, Earth visible in the background', promptRu: 'Девочка в милом розовом скафандре парит среди тысяч мерцающих звёзд, Земля видна на заднем плане', styleTags: ['astronaut', 'stars', 'earth', 'pink'], poseHint: 'Floating freely with arms spread wide', poseHintRu: 'Свободно парит с широко раскинутыми руками', order: 1 },
-    { id: 'space_2', prompt: 'A girl walking along the glowing rings of Saturn, leaving footprints of stardust behind her', promptRu: 'Девочка идёт по светящимся кольцам Сатурна, оставляя за собой следы из звёздной пыли', styleTags: ['saturn', 'rings', 'stardust', 'walking'], order: 2 },
-    { id: 'space_3', prompt: 'A young astronaut girl painting a colorful nebula with a giant cosmic paintbrush, swirls of purple and gold', promptRu: 'Юная девочка-космонавт рисует разноцветную туманность гигантской космической кистью, завитки фиолетового и золотого', styleTags: ['nebula', 'painting', 'creative', 'colorful'], poseHint: 'Arm extended with brush, painting in mid-air', poseHintRu: 'Рука вытянута с кистью, рисует в воздухе', order: 3 },
-    { id: 'space_4', prompt: 'A girl tending a magical garden inside a space station dome, flowers and plants growing in zero gravity', promptRu: 'Девочка ухаживает за волшебным садом внутри купола космической станции, цветы и растения растут в невесомости', styleTags: ['space_station', 'garden', 'zero_gravity', 'botanical'], order: 4 },
-    { id: 'space_5', prompt: 'A brave girl surfing on the tail of a bright comet streaking across a galaxy of swirling colors', promptRu: 'Смелая девочка сёрфит на хвосте яркой кометы, летящей через галактику закрученных цветов', styleTags: ['comet', 'surfing', 'galaxy', 'adventure'], order: 5 },
-    { id: 'space_6', prompt: 'A girl having a tea party with friendly colorful aliens on a planet with two pink moons', promptRu: 'Девочка устраивает чаепитие с дружелюбными разноцветными инопланетянами на планете с двумя розовыми лунами', styleTags: ['aliens', 'tea_party', 'planet', 'whimsical'], poseHint: 'Sitting cross-legged, holding a space teacup', poseHintRu: 'Сидит скрестив ноги, держит космическую чашку', order: 6 },
-  ],
 };
+
+// =============================================================================
+// Preset 5: Forest Tale
+// =============================================================================
+
+const forestTalePrompts: ImagePrompt[] = [
+  {
+    id: 'forest_1',
+    prompt: 'A little girl in a woodland dress sitting under a giant ancient oak tree, friendly squirrels and rabbits gathered around her, dappled sunlight',
+    promptRu: 'Маленькая девочка в лесном платье сидит под гигантским старинным дубом, дружелюбные белки и кролики собрались вокруг неё, пятнистый солнечный свет',
+    styleTags: ['oak_tree', 'woodland', 'squirrels', 'dappled_light'],
+    poseHint: 'Sitting at the base of the tree, a rabbit on her lap',
+    poseHintRu: 'Сидит у подножия дерева, кролик на коленях',
+    order: 1,
+  },
+  {
+    id: 'forest_2',
+    prompt: 'A girl discovering a tiny door at the base of a mossy tree trunk in an enchanted forest, glowing warm light spilling from inside, mushrooms lining the path',
+    promptRu: 'Девочка обнаруживает крошечную дверь у основания поросшего мхом ствола дерева в заколдованном лесу, тёплый свет льётся изнутри, грибы вдоль тропинки',
+    styleTags: ['discovery', 'fairy_door', 'mossy', 'enchanted'],
+    poseHint: 'Kneeling down, peeking at the tiny door with wonder',
+    poseHintRu: 'На коленях, с восхищением заглядывает в крошечную дверь',
+    order: 2,
+  },
+  {
+    id: 'forest_3',
+    prompt: 'A woodland girl walking across a natural bridge made of a fallen log over a sparkling forest stream, wild berries and ferns on both sides',
+    promptRu: 'Лесная девочка идёт по природному мостику из упавшего бревна через сверкающий лесной ручей, дикие ягоды и папоротники по обоим берегам',
+    styleTags: ['bridge', 'stream', 'berries', 'ferns'],
+    poseHint: 'Walking with arms out for balance, looking down at the water',
+    poseHintRu: 'Идёт с руками в стороны для баланса, смотрит вниз на воду',
+    order: 3,
+  },
+  {
+    id: 'forest_4',
+    prompt: 'A girl befriending a baby deer in a sunlit forest clearing, wildflowers blooming everywhere, butterflies in the air, soft warm atmosphere',
+    promptRu: 'Девочка подружилась с оленёнком на солнечной лесной поляне, повсюду цветут полевые цветы, бабочки в воздухе, мягкая тёплая атмосфера',
+    styleTags: ['deer', 'clearing', 'wildflowers', 'butterflies'],
+    poseHint: 'Gently petting the baby deer, both looking at each other',
+    poseHintRu: 'Нежно гладит оленёнка, оба смотрят друг на друга',
+    order: 4,
+  },
+  {
+    id: 'forest_5',
+    prompt: 'A little girl sitting in a circle of colorful toadstools reading a map drawn on birch bark, a wise old owl perched on a branch above watching',
+    promptRu: 'Маленькая девочка сидит в кругу разноцветных мухоморов, читая карту на бересте, мудрая старая сова сидит на ветке наверху и наблюдает',
+    styleTags: ['toadstools', 'map', 'owl', 'birch'],
+    poseHint: 'Cross-legged inside the mushroom circle, studying the map',
+    poseHintRu: 'По-турецки внутри круга грибов, изучает карту',
+    order: 5,
+  },
+  {
+    id: 'forest_6',
+    prompt: 'A forest girl building a tiny house from twigs and leaves for woodland fairies, miniature furniture visible inside, moss carpet on the floor',
+    promptRu: 'Лесная девочка строит крошечный домик из веточек и листьев для лесных фей, внутри видна миниатюрная мебель, ковёр из мха на полу',
+    styleTags: ['crafting', 'fairy_house', 'twigs', 'miniature'],
+    poseHint: 'On her knees, carefully placing a tiny leaf roof',
+    poseHintRu: 'На коленях, аккуратно устанавливает крошечную крышу из листка',
+    order: 6,
+  },
+  {
+    id: 'forest_7',
+    prompt: 'A girl swinging on a vine over a carpet of autumn leaves, red and gold forest canopy above, a hedgehog watching from below with acorns',
+    promptRu: 'Девочка качается на лиане над ковром осенних листьев, красно-золотой полог леса наверху, ёжик наблюдает снизу с жёлудями',
+    styleTags: ['swinging', 'autumn', 'hedgehog', 'vine'],
+    poseHint: 'Mid-swing, hair and dress flowing, laughing',
+    poseHintRu: 'В полёте на качелях, волосы и платье развеваются, смеётся',
+    order: 7,
+  },
+  {
+    id: 'forest_8',
+    prompt: 'A little girl following a trail of glowing mushrooms deeper into a magical twilight forest, fireflies lighting the way, ancient tree faces watching kindly',
+    promptRu: 'Маленькая девочка идёт по тропинке из светящихся грибов вглубь волшебного сумеречного леса, светлячки освещают путь, древние лица на деревьях добро наблюдают',
+    styleTags: ['glowing_mushrooms', 'twilight', 'fireflies', 'tree_faces'],
+    poseHint: 'Walking forward with curiosity, one hand reaching toward a glowing mushroom',
+    poseHintRu: 'Идёт вперёд с любопытством, одна рука тянется к светящемуся грибу',
+    order: 8,
+  },
+  {
+    id: 'forest_9',
+    prompt: 'A girl playing a wooden flute on a tree stump stage, forest animals gathered as audience in a moonlit glade, stars twinkling through the branches',
+    promptRu: 'Девочка играет на деревянной флейте на сцене из пня, лесные животные собрались в качестве зрителей на залитой лунным светом поляне, звёзды мерцают сквозь ветви',
+    styleTags: ['music', 'flute', 'moonlit', 'animal_audience'],
+    poseHint: 'Standing on the stump, playing flute with eyes closed',
+    poseHintRu: 'Стоит на пне, играет на флейте с закрытыми глазами',
+    order: 9,
+  },
+];
 
 const forestTalePreset: ImagePreset = {
   id: 'forest_tale',
   name: 'Forest Tale',
   nameRu: 'Лесная сказка',
-  description: 'Magical forest adventures with woodland creatures',
-  descriptionRu: 'Волшебные лесные приключения с лесными обитателями',
+  description: 'An enchanted forest adventure with friendly animals, magical mushrooms, and ancient trees',
+  descriptionRu: 'Волшебное лесное приключение с дружелюбными животными, магическими грибами и древними деревьями',
   category: 'nature',
   emoji: '🌲',
   accentColor: '#8D6E63',
   author: 'NanaBanana',
   difficulty: 'medium',
   photoCount: 9,
+  prompts: forestTalePrompts,
   isPremium: true,
-  tags: ['forest', 'animals', 'mushrooms', 'nature'],
+  tags: ['forest', 'animals', 'mushrooms', 'enchanted', 'woodland', 'nature', 'fairy-tale'],
   ageMin: 3,
   ageMax: 8,
-  prompts: [
-    { id: 'forest_1', prompt: 'A girl peeking out of a cozy little house built inside a giant red-capped mushroom in a mossy forest', promptRu: 'Девочка выглядывает из уютного домика внутри гигантского гриба с красной шляпкой во мшистом лесу', styleTags: ['mushroom', 'cozy', 'forest', 'fairy_tale'], poseHint: 'Peeking through a round window, smiling', poseHintRu: 'Выглядывает через круглое окошко, улыбаясь', order: 1 },
-    { id: 'forest_2', prompt: 'A girl gently petting a baby deer in a sun-dappled forest clearing with wildflowers all around', promptRu: 'Девочка нежно гладит оленёнка на солнечной лесной поляне, усеянной полевыми цветами', styleTags: ['deer', 'gentle', 'sunlight', 'meadow'], order: 2 },
-    { id: 'forest_3', prompt: 'A girl holding a jar filled with glowing fireflies, illuminating a dark enchanted forest path', promptRu: 'Девочка держит банку, полную светящихся светлячков, освещающих тёмную тропинку волшебного леса', styleTags: ['fireflies', 'glow', 'night', 'magical'], poseHint: 'Holding jar at chest height, face lit by soft glow', poseHintRu: 'Держит банку на уровне груди, лицо освещено мягким свечением', order: 3 },
-    { id: 'forest_4', prompt: 'A girl sitting in a treehouse library high in an ancient oak tree, surrounded by books and hanging lanterns', promptRu: 'Девочка сидит в библиотеке-домике на дереве высоко на старом дубе, окружённая книгами и подвесными фонариками', styleTags: ['treehouse', 'books', 'lanterns', 'cozy'], order: 4 },
-    { id: 'forest_5', prompt: 'A girl picking wild berries into a woven basket, surrounded by friendly forest rabbits and squirrels', promptRu: 'Девочка собирает лесные ягоды в плетёную корзинку, вокруг неё дружелюбные зайчики и белочки', styleTags: ['berries', 'basket', 'animals', 'foraging'], poseHint: 'Kneeling, one hand reaching for berries', poseHintRu: 'Стоит на коленях, одна рука тянется к ягодам', order: 5 },
-    { id: 'forest_6', prompt: 'A girl wearing a crown woven from autumn leaves, acorns and tiny woodland flowers', promptRu: 'Девочка в короне, сплетённой из осенних листьев, желудей и крошечных лесных цветов', styleTags: ['crown', 'autumn', 'woodland', 'natural'], order: 6 },
-    { id: 'forest_7', prompt: 'A girl receiving a tiny scroll message from a wise owl perched on a branch in misty morning light', promptRu: 'Девочка получает крошечное письмо-свиток от мудрой совы, сидящей на ветке в утреннем тумане', styleTags: ['owl', 'message', 'misty', 'morning'], poseHint: 'Hand outstretched, owl landing on wrist', poseHintRu: 'Рука протянута, сова садится на запястье', order: 7 },
-    { id: 'forest_8', prompt: 'A girl sheltering under a giant leaf during a gentle rain, watching rainbow droplets fall around her', promptRu: 'Девочка прячется под гигантским листом во время тёплого дождика, наблюдая за радужными каплями вокруг', styleTags: ['rain', 'shelter', 'rainbow', 'cozy'], order: 8 },
-    { id: 'forest_9', prompt: 'A girl dancing with swirling autumn leaves in a golden forest, leaves forming magical spiral patterns around her', promptRu: 'Девочка танцует с кружащимися осенними листьями в золотом лесу, листья образуют волшебные спиральные узоры вокруг неё', styleTags: ['autumn', 'dance', 'golden', 'leaves'], poseHint: 'Spinning with arms out, leaves swirling around', poseHintRu: 'Кружится с раскинутыми руками, листья вихрятся вокруг', order: 9 },
-  ],
 };
+
+// =============================================================================
+// Preset 6: Fashion Show
+// =============================================================================
+
+const fashionShowPrompts: ImagePrompt[] = [
+  {
+    id: 'fashion_1',
+    prompt: 'A little girl strutting down a sparkly pink runway in a tutu and tiara, spotlights beaming, confetti falling, audience silhouettes in the background',
+    promptRu: 'Маленькая девочка шагает по сверкающему розовому подиуму в пачке и тиаре, прожекторы светят, конфетти падает, силуэты зрителей на заднем плане',
+    styleTags: ['runway', 'tutu', 'spotlights', 'confetti'],
+    poseHint: 'Walking confidently with one hand on hip',
+    poseHintRu: 'Идёт уверенно, одна рука на бедре',
+    order: 1,
+  },
+  {
+    id: 'fashion_2',
+    prompt: 'A young fashionista posing in front of a vintage full-length mirror wearing an oversized sun hat and colorful summer dress, flower bouquet in hand',
+    promptRu: 'Юная модница позирует перед винтажным зеркалом в полный рост в огромной шляпе от солнца и разноцветном летнем платье, букет цветов в руке',
+    styleTags: ['mirror', 'sun_hat', 'summer_dress', 'vintage'],
+    poseHint: 'Turning slightly to see her reflection, bouquet held up',
+    poseHintRu: 'Слегка поворачивается к отражению, букет поднят',
+    order: 2,
+  },
+  {
+    id: 'fashion_3',
+    prompt: 'A girl designer sketching a dress on a large easel in a bright fashion studio, fabric swatches pinned to the wall, colorful threads and ribbons everywhere',
+    promptRu: 'Девочка-дизайнер рисует платье на большом мольберте в светлой модной студии, образцы тканей на стене, разноцветные нитки и ленты повсюду',
+    styleTags: ['designer', 'studio', 'sketching', 'creative'],
+    poseHint: 'Standing at the easel with pencil in hand, concentrated expression',
+    poseHintRu: 'Стоит у мольберта с карандашом, сосредоточенное выражение',
+    order: 3,
+  },
+  {
+    id: 'fashion_4',
+    prompt: 'A little girl trying on sparkly shoes in a magical shoe closet with shelves reaching the ceiling, each pair more fantastical than the last, fairy lights twinkling',
+    promptRu: 'Маленькая девочка примеряет блестящие туфельки в волшебном обувном шкафу с полками до потолка, каждая пара фантастичнее предыдущей, гирлянды мерцают',
+    styleTags: ['shoes', 'closet', 'sparkly', 'fairy_lights'],
+    poseHint: 'Sitting on a stool, one foot out trying a glass slipper',
+    poseHintRu: 'Сидит на стульчике, одна ножка вытянута, примеряет хрустальную туфельку',
+    order: 4,
+  },
+  {
+    id: 'fashion_5',
+    prompt: 'A girl posing on a red carpet at a movie premiere, wearing a glamorous evening gown with sequins, camera flashes all around, velvet rope barriers',
+    promptRu: 'Девочка позирует на красной дорожке на кинопремьере в гламурном вечернем платье с пайетками, вспышки камер повсюду, бархатные ограждения',
+    styleTags: ['red_carpet', 'premiere', 'glamour', 'sequins'],
+    poseHint: 'Classic red carpet pose with slight turn and smile',
+    poseHintRu: 'Классическая поза на красной дорожке с лёгким поворотом и улыбкой',
+    order: 5,
+  },
+  {
+    id: 'fashion_6',
+    prompt: 'A young model in a raincoat and rain boots jumping in a puddle during a fashion photoshoot in the city, colorful umbrellas in the background, joyful splash',
+    promptRu: 'Юная модель в дождевике и резиновых сапожках прыгает в лужу во время модной фотосессии в городе, разноцветные зонтики на фоне, радостный всплеск',
+    styleTags: ['rain', 'puddle', 'raincoat', 'urban'],
+    poseHint: 'Mid-jump into the puddle with big splash, arms up',
+    poseHintRu: 'В прыжке в лужу с большим всплеском, руки вверх',
+    order: 6,
+  },
+  {
+    id: 'fashion_7',
+    prompt: 'A girl wearing a flower crown and bohemian dress twirling in a lavender field, golden hour sunlight, flowing fabric catching the wind',
+    promptRu: 'Девочка в цветочном венке и платье в стиле бохо кружится на лавандовом поле, солнечный свет золотого часа, развевающаяся ткань ловит ветер',
+    styleTags: ['boho', 'lavender', 'golden_hour', 'flower_crown'],
+    poseHint: 'Twirling with arms out, dress and hair flowing',
+    poseHintRu: 'Кружится с раскинутыми руками, платье и волосы развеваются',
+    order: 7,
+  },
+  {
+    id: 'fashion_8',
+    prompt: 'A little fashion editor sitting at a tiny desk covered in fashion magazines, big round glasses, pencil behind ear, miniature coffee cup, serious creative expression',
+    promptRu: 'Маленький модный редактор сидит за крошечным столиком, заваленным модными журналами, большие круглые очки, карандаш за ухом, миниатюрная чашка кофе, серьёзное творческое выражение',
+    styleTags: ['editor', 'magazines', 'glasses', 'desk'],
+    poseHint: 'Chin resting on hand, studying a magazine spread',
+    poseHintRu: 'Подбородок на руке, изучает разворот журнала',
+    order: 8,
+  },
+  {
+    id: 'fashion_9',
+    prompt: 'A girl backstage at a fashion show getting her hair styled, surrounded by makeup palettes and brushes, mirror with light bulbs, excited anticipation',
+    promptRu: 'Девочка за кулисами модного показа, ей делают причёску, вокруг палитры для макияжа и кисти, зеркало с лампочками, радостное предвкушение',
+    styleTags: ['backstage', 'makeup', 'hairstyle', 'preparation'],
+    poseHint: 'Sitting in the makeup chair, looking at herself in the lit mirror',
+    poseHintRu: 'Сидит в кресле для макияжа, смотрит на себя в освещённое зеркало',
+    order: 9,
+  },
+  {
+    id: 'fashion_10',
+    prompt: 'A group finale on the runway with a girl in the center wearing a showstopping rainbow gown, other outfit silhouettes around her, standing ovation moment, dramatic lighting',
+    promptRu: 'Групповой финал на подиуме с девочкой в центре в потрясающем радужном платье, силуэты других нарядов вокруг неё, момент стоячей овации, драматическое освещение',
+    styleTags: ['finale', 'rainbow', 'ovation', 'dramatic'],
+    poseHint: 'Standing center stage, arms slightly open, triumphant smile',
+    poseHintRu: 'Стоит в центре сцены, руки слегка разведены, торжествующая улыбка',
+    order: 10,
+  },
+];
 
 const fashionShowPreset: ImagePreset = {
   id: 'fashion_show',
   name: 'Fashion Show',
   nameRu: 'Модный показ',
-  description: 'Runway-ready photo sessions with stylish outfits and accessories',
-  descriptionRu: 'Фотосессии в стиле подиума с модными нарядами и аксессуарами',
+  description: 'A glamorous fashion adventure with runway walks, designer studios, and fabulous outfits',
+  descriptionRu: 'Гламурное модное приключение с подиумными выходами, дизайнерскими студиями и потрясающими нарядами',
   category: 'fashion',
   emoji: '👗',
   accentColor: '#EF5350',
   author: 'NanaBanana',
   difficulty: 'creative',
   photoCount: 10,
+  prompts: fashionShowPrompts,
   isPremium: true,
-  tags: ['fashion', 'runway', 'style', 'design'],
-  ageMin: 5,
+  tags: ['fashion', 'runway', 'outfits', 'glamour', 'designer', 'style', 'modeling'],
+  ageMin: 3,
   ageMax: 8,
-  prompts: [
-    { id: 'fashion_1', prompt: 'A confident girl making a grand entrance on a pink glitter runway with spotlights and camera flashes', promptRu: 'Уверенная девочка делает эффектный выход на розовый блестящий подиум в лучах прожекторов и вспышках камер', styleTags: ['runway', 'pink', 'glitter', 'spotlight'], poseHint: 'Walking forward with one hand on hip', poseHintRu: 'Идёт вперёд, одна рука на бедре', order: 1 },
-    { id: 'fashion_2', prompt: 'A girl trying on an amazing collection of fancy hats in a vintage boutique with ornate mirrors', promptRu: 'Девочка примеряет потрясающую коллекцию нарядных шляпок в винтажном бутике с витиеватыми зеркалами', styleTags: ['hats', 'vintage', 'boutique', 'mirrors'], order: 2 },
-    { id: 'fashion_3', prompt: 'A girl spinning in a dress covered in thousands of tiny sparkles, creating a shower of light around her', promptRu: 'Девочка кружится в платье, покрытом тысячами крошечных блёсток, создавая дождь из света вокруг себя', styleTags: ['sparkle', 'spinning', 'dress', 'light'], poseHint: 'Mid-spin with dress flaring out', poseHintRu: 'В момент кружения, платье расходится веером', order: 3 },
-    { id: 'fashion_4', prompt: 'A young designer girl working at a colorful fabric studio, surrounded by ribbons, buttons and sewing machines', promptRu: 'Юная девочка-дизайнер работает в красочной мастерской тканей, окружённая лентами, пуговицами и швейными машинками', styleTags: ['designer', 'studio', 'colorful', 'creative'], order: 4 },
-    { id: 'fashion_5', prompt: 'A girl crafting handmade jewelry and accessories at a magical workshop table with glowing gems', promptRu: 'Девочка мастерит украшения и аксессуары ручной работы за волшебным рабочим столом со светящимися камнями', styleTags: ['jewelry', 'workshop', 'handmade', 'gems'], poseHint: 'Focused on crafting, holding tiny tweezers', poseHintRu: 'Сосредоточена на работе, держит маленький пинцет', order: 5 },
-    { id: 'fashion_6', prompt: 'A girl posing in a beautiful summer dress in a sunflower garden for a magazine cover photo', promptRu: 'Девочка позирует в красивом летнем платье в подсолнуховом саду для обложки журнала', styleTags: ['summer', 'sunflowers', 'photoshoot', 'magazine'], order: 6 },
-    { id: 'fashion_7', prompt: 'A girl modeling a cozy winter collection with a fluffy white coat, sparkly boots and a beret in falling snow', promptRu: 'Девочка демонстрирует уютную зимнюю коллекцию в пушистом белом пальто, блестящих сапожках и берете под падающим снегом', styleTags: ['winter', 'cozy', 'snow', 'boots'], poseHint: 'Catching snowflakes with open palms', poseHintRu: 'Ловит снежинки раскрытыми ладонями', order: 7 },
-    { id: 'fashion_8', prompt: 'A girl in a flowing bohemian outfit dancing at a colorful outdoor festival with flower garlands and lanterns', promptRu: 'Девочка в струящемся наряде бохо танцует на красочном уличном фестивале с цветочными гирляндами и фонариками', styleTags: ['bohemian', 'festival', 'dance', 'flowers'], order: 8 },
-    { id: 'fashion_9', prompt: 'A girl in a chic yellow raincoat and polka-dot rain boots splashing happily in puddles on a rainy city street', promptRu: 'Девочка в шикарном жёлтом дождевике и резиновых сапожках в горошек весело прыгает по лужам на дождливой городской улице', styleTags: ['rain', 'yellow', 'city', 'playful'], poseHint: 'Mid-jump into a puddle, arms up in joy', poseHintRu: 'В прыжке в лужу, руки подняты от радости', order: 9 },
-    { id: 'fashion_10', prompt: 'A girl taking a final bow on a flower-covered runway stage, confetti and petals falling all around her', promptRu: 'Девочка делает финальный поклон на подиуме, украшенном цветами, вокруг летят конфетти и лепестки', styleTags: ['finale', 'bow', 'confetti', 'celebration'], order: 10 },
-  ],
 };
 
+// =============================================================================
+// Exports
+// =============================================================================
+
 export const IMAGE_PRESETS: ImagePreset[] = [
-  princessPreset,
+  magicPrincessPreset,
   flowerFairyPreset,
-  underwaterPreset,
-  spaceGirlPreset,
+  underwaterKingdomPreset,
+  spaceTravelerPreset,
   forestTalePreset,
   fashionShowPreset,
 ];
 
 export function getPresetById(id: string): ImagePreset | undefined {
-  return IMAGE_PRESETS.find((p) => p.id === id);
+  return IMAGE_PRESETS.find((preset) => preset.id === id);
 }
 
 export function getPresetsByCategory(category: string): ImagePreset[] {
-  return IMAGE_PRESETS.filter((p) => p.category === category);
+  return IMAGE_PRESETS.filter((preset) => preset.category === category);
 }
 
 export function getFreePresets(): ImagePreset[] {
-  return IMAGE_PRESETS.filter((p) => !p.isPremium);
+  return IMAGE_PRESETS.filter((preset) => !preset.isPremium);
 }
 
 export function getPremiumPresets(): ImagePreset[] {
-  return IMAGE_PRESETS.filter((p) => p.isPremium);
+  return IMAGE_PRESETS.filter((preset) => preset.isPremium);
 }
